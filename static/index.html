@@ -9,12 +9,20 @@
 </head>
 <body>
     <h1 class="title">🍌 nano banana</h1>
-    <p class="subtitle">(模型: google/gemini-2.5-flash-image-preview)</p>
+    <p class="subtitle">(模型: google/gemini-2.5-flash-image-preview:free)</p>
     <div class="main-container">
         <div class="controls-container">
             <div class="api-key-section">
                 <h2>设置</h2>
                 <input type="password" id="api-key-input" placeholder="输入你的 OpenRouter API 密钥 (必填)">
+                <div class="api-key-controls">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="remember-key-checkbox">
+                        <span class="checkmark"></span>
+                        记住密钥
+                    </label>
+                    <button type="button" id="clear-key-btn" class="clear-btn">清除已保存密钥</button>
+                </div>
             </div>
             <div class="upload-section">
                 <h2>1. 上传图片</h2>
@@ -30,6 +38,13 @@
 
             <div class="prompt-section">
                 <h2>2. 输入提示词</h2>
+                <div class="template-controls">
+                    <select id="template-select">
+                        <option value="">选择提示词模板...</option>
+                    </select>
+                    <button type="button" id="save-template-btn" class="template-btn">保存为模板</button>
+                    <button type="button" id="manage-templates-btn" class="template-btn">管理模板</button>
+                </div>
                 <textarea id="prompt-input" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
             </div>
 
@@ -46,6 +61,29 @@
             </div>
         </div>
     </div>
+
+    <!-- 模板管理弹窗 -->
+    <div id="template-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>管理提示词模板</h3>
+                <button type="button" id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="new-template-section">
+                    <h4>添加新模板</h4>
+                    <input type="text" id="new-template-name" placeholder="模板名称">
+                    <textarea id="new-template-content" placeholder="模板内容"></textarea>
+                    <button type="button" id="add-template-btn" class="modal-btn">添加模板</button>
+                </div>
+                <div class="existing-templates-section">
+                    <h4>现有模板</h4>
+                    <div id="templates-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
