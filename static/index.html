@@ -9,7 +9,7 @@
 </head>
 <body>
     <h1 class="title">🍌 nano banana</h1>
-    <p class="subtitle">(模型: google/gemini-2.5-flash-image-preview)</p>
+    <p class="subtitle">(模型: google/gemini-2.5-flash-image-preview:free)</p>
     <div class="main-container">
         <div class="controls-container">
             <div class="api-key-section">
@@ -23,17 +23,6 @@
                     </label>
                     <button type="button" id="clear-key-btn" class="clear-btn">清除已保存密钥</button>
                 </div>
-                
-                <!-- 数据备份恢复功能 -->
-                <div class="backup-controls">
-                    <h3>数据备份</h3>
-                    <div class="backup-buttons">
-                        <button type="button" id="export-data-btn" class="backup-btn" onclick="exportUserData()">导出数据</button>
-                        <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(this)">
-                        <button type="button" id="import-data-btn" class="backup-btn" onclick="document.getElementById('import-file-input').click()">导入数据</button>
-                    </div>
-                    <p class="backup-note">💡 导出数据可保存您的API密钥和提示词模板，即使修改代码也不会丢失</p>
-                </div>
             </div>
             <div class="upload-section">
                 <h2>1. 上传图片</h2>
@@ -42,6 +31,7 @@
                     <label for="image-upload">
                         <p>点击或拖拽上传</p>
                         <span>支持多张图片</span>
+                        <p class="upload-hint">💡 图片上传是可选的，支持纯文字生成图片</p>
                     </label>
                 </div>
                 <div id="thumbnails-container"></div>
