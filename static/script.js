@@ -3,12 +3,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadArea = document.querySelector('.upload-area');
     const fileInput = document.getElementById('image-upload');
     const thumbnailsContainer = document.getElementById('thumbnails-container');
-    const promptInput = document.getElementById('prompt-input');
     const apiKeyInput = document.getElementById('api-key-input');
-    const generateBtn = document.getElementById('generate-btn');
-    const btnText = generateBtn.querySelector('.btn-text');
-    const spinner = generateBtn.querySelector('.spinner');
-    const resultContainer = document.getElementById('result-image-container');
+    
+    // 检查元素是否存在，避免null错误
+    const promptInput = document.getElementById('prompt-input'); // 可能不存在
+    const generateBtn = document.getElementById('generate-btn'); // 可能不存在
+    const btnText = generateBtn ? generateBtn.querySelector('.btn-text') : null;
+    const spinner = generateBtn ? generateBtn.querySelector('.spinner') : null;
+    const resultContainer = document.getElementById('result-image-container'); // 可能不存在
 
     // === 新功能元素获取 ===
     const rememberKeyCheckbox = document.getElementById('remember-key-checkbox');
@@ -32,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportChatBtn = document.getElementById('export-chat-btn');
     const togglePanelBtn = document.getElementById('toggle-panel-btn');
     const controlsPanel = document.querySelector('.controls-panel');
+    
+    // 检查聊天功能是否可用
+    const isChatAvailable = chatMessages && chatInput && sendMessageBtn;
 
     let selectedFiles = [];
     let chatManager = new ChatManager();
@@ -146,6 +151,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 聊天界面初始化 ===
     function initializeChatUI() {
+        // 检查聊天功能是否可用
+        if (!isChatAvailable) {
+            console.log('聊天功能不可用，跳过聊天界面初始化');
+            return;
+        }
+        
         // 加载历史聊天记录
         renderChatHistory();
         // 滚动到底部
@@ -154,6 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 渲染聊天历史 ===
     function renderChatHistory() {
+        if (!chatMessages) return; // 检查聊天容器是否存在
+        
         const messages = chatManager.getAllMessages();
         
         // 清空聊天容器（保留欢迎消息）
@@ -175,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 渲染单条消息 ===
     function renderMessage(message) {
+        if (!chatMessages) return; // 检查聊天容器是否存在
+        
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${message.role}`;
         messageDiv.dataset.messageId = message.id;
@@ -206,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 滚动到底部 ===
     function scrollToBottom() {
+        if (!chatMessages) return; // 检查聊天容器是否存在
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
@@ -446,20 +462,30 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModalBtn.addEventListener('click', closeTemplateModal);
         addTemplateBtn.addEventListener('click', addNewTemplate);
         
-        // 聊天功能事件
-        sendMessageBtn.addEventListener('click', sendChatMessage);
-        attachImageBtn.addEventListener('click', () => fileInput.click());
-        clearChatBtn.addEventListener('click', clearChatHistory);
-        exportChatBtn.addEventListener('click', exportChatHistory);
-        togglePanelBtn.addEventListener('click', toggleControlsPanel);
-        
-        // 聊天输入框事件
-        chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendChatMessage();
+        // 聊天功能事件 - 添加可用性检查
+        if (isChatAvailable) {
+            sendMessageBtn.addEventListener('click', sendChatMessage);
+            if (attachImageBtn && fileInput) {
+                attachImageBtn.addEventListener('click', () => fileInput.click());
             }
-        });
+            if (clearChatBtn) {
+                clearChatBtn.addEventListener('click', clearChatHistory);
+            }
+            if (exportChatBtn) {
+                exportChatBtn.addEventListener('click', exportChatHistory);
+            }
+            if (togglePanelBtn) {
+                togglePanelBtn.addEventListener('click', toggleControlsPanel);
+            }
+            
+            // 聊天输入框事件
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+        }
         
         // 模态框背景点击关闭
         templateModal.addEventListener('click', (e) => {
@@ -479,37 +505,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // === 启动应用 ===
     initializeApp();
 
-    // 拖放功能
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        uploadArea.addEventListener(eventName, preventDefaults, false);
-    });
+    // 拖放功能 - 添加null检查
+    if (uploadArea) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.add('drag-over');
+            });
+        });
+    }
 
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-        uploadArea.addEventListener(eventName, () => {
-            uploadArea.classList.add('drag-over');
+    if (uploadArea) {
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.remove('drag-over');
+            });
         });
-    });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-        uploadArea.addEventListener(eventName, () => {
-            uploadArea.classList.remove('drag-over');
+        uploadArea.addEventListener('drop', (e) => {
+            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            handleFiles(files);
         });
-    });
+    }
 
-    uploadArea.addEventListener('drop', (e) => {
-        const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
-        handleFiles(files);
-    });
-
-    fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
-        handleFiles(files);
-    });
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+            handleFiles(files);
+        });
+    }
 
     function handleFiles(files) {
         files.forEach(file => {
@@ -521,6 +553,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createThumbnail(file) {
+        if (!thumbnailsContainer) return; // 如果容器不存在则直接返回
+        
         const reader = new FileReader();
         reader.onload = (e) => {
             const wrapper = document.createElement('div');
