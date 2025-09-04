@@ -100,6 +100,17 @@ h2 {
     font-style: italic;
 }
 
+.generation-tips {
+    font-size: 0.85em;
+    color: #f97316;
+    margin-top: 5px;
+    font-weight: 500;
+    background: rgba(249, 115, 22, 0.1);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #f97316;
+}
+
 .upload-area p {
     margin: 0 0 0.5rem 0;
     font-size: 1.1rem;
