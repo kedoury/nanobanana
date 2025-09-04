@@ -33,7 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // === 预设模板数据 ===
-    const DEFAULT_TEMPLATES = [];
+    const DEFAULT_TEMPLATES = [
+        {
+            name: "图1改图2尺寸",
+            content: "Transfer the content of Figure 1 to Figure 2. Expand Figure 1's content to match Figure 2's aspect ratio. Completely erase Figure 2's existing content, retaining only its aspect ratio"
+        },
+        {
+            name: "整合内容尺寸到最后一张图",
+            content: "Transfer the completed content to the final figure. Expand the image content to match the final figure's aspect ratio. Completely erase the final figure's existing content, retaining only its aspect ratio"
+        }
+    ];
 
     // === 初始化函数 ===
     async function initializeApp() {
@@ -150,7 +159,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const templates = getStoredTemplates();
             const template = templates[selectedIndex];
             if (template) {
-                promptInput.value = template.content;
+                // 如果已有内容，就追加到后面，否则直接设置
+                const currentContent = promptInput.value.trim();
+                if (currentContent) {
+                    // 在现有内容后面添加换行符和新模板内容
+                    promptInput.value = currentContent + '\n\n' + template.content;
+                } else {
+                    // 如果没有内容，直接设置模板内容
+                    promptInput.value = template.content;
+                }
             }
         }
     }
