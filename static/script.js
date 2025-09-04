@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
             button.classList.add('active');
             
             // 加载尺寸模板图片
-            const imageUrl = `/static/${fileName}`;
+             const imageUrl = `/${fileName}`;
             const response = await fetch(imageUrl);
             
             if (!response.ok) {
