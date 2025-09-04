@@ -76,6 +76,129 @@ document.addEventListener('DOMContentLoaded', () => {
     // 默认模板已清空，用户可以自行添加模板
     const DEFAULT_TEMPLATES = [];
 
+    // === 数据结构类定义 ===
+    
+    /**
+     * 消息类 - 表示单条聊天消息
+     */
+    class Message {
+        constructor(data = {}) {
+            this.id = data.id || this.generateId();
+            this.role = data.role || 'user'; // 'user' | 'assistant'
+            this.content = data.content || '';
+            this.images = data.images || [];
+            this.timestamp = data.timestamp || Date.now();
+            this.size = data.size || this.calculateSize();
+            this.metadata = data.metadata || {};
+        }
+        
+        // 生成唯一ID
+        generateId() {
+            return 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // 计算消息大小
+        calculateSize() {
+            let size = new Blob([this.content]).size;
+            this.images.forEach(img => {
+                if (img.data) {
+                    size += img.data.length * 0.75; // Base64编码大约增加33%
+                }
+            });
+            return size;
+        }
+        
+        // 转换为API格式
+        toApiFormat() {
+            const apiMessage = {
+                role: this.role,
+                content: this.content
+            };
+            
+            if (this.images && this.images.length > 0) {
+                apiMessage.images = this.images.map(img => ({
+                    type: 'image',
+                    data: img.data,
+                    format: img.format || 'jpeg'
+                }));
+            }
+            
+            return apiMessage;
+        }
+    }
+    
+    /**
+     * 会话类 - 表示一个完整的对话会话
+     */
+    class Conversation {
+        constructor(data = {}) {
+            this.id = data.id || this.generateId();
+            this.title = data.title || '新对话';
+            this.messages = data.messages || [];
+            this.createdAt = data.createdAt || Date.now();
+            this.updatedAt = data.updatedAt || Date.now();
+            this.totalSize = data.totalSize || 0;
+            this.isPinned = data.isPinned || false;
+            this.settings = data.settings || {
+                maxContextMessages: CHAT_CONFIG.MAX_CONTEXT_MESSAGES,
+                model: 'google/gemini-2.5-flash-image-preview'
+            };
+        }
+        
+        // 生成唯一ID
+        generateId() {
+            return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // 添加消息
+        addMessage(message) {
+            if (!(message instanceof Message)) {
+                message = new Message(message);
+            }
+            this.messages.push(message);
+            this.updatedAt = Date.now();
+            this.updateTotalSize();
+            return message;
+        }
+        
+        // 获取最后一条消息
+        getLastMessage() {
+            return this.messages[this.messages.length - 1] || null;
+        }
+        
+        // 获取用户消息数量
+        getUserMessageCount() {
+            return this.messages.filter(msg => msg.role === 'user').length;
+        }
+        
+        // 更新总大小
+        updateTotalSize() {
+            this.totalSize = this.messages.reduce((total, msg) => total + (msg.size || 0), 0);
+        }
+        
+        // 生成会话标题
+        generateTitle() {
+            const firstUserMessage = this.messages.find(msg => msg.role === 'user');
+            if (firstUserMessage && firstUserMessage.content) {
+                // 取前20个字符作为标题
+                this.title = firstUserMessage.content.substring(0, 20).trim();
+                if (firstUserMessage.content.length > 20) {
+                    this.title += '...';
+                }
+            } else {
+                this.title = `对话 ${new Date(this.createdAt).toLocaleDateString()}`;
+            }
+            return this.title;
+        }
+        
+        // 切换置顶状态
+        togglePin() {
+            this.isPinned = !this.isPinned;
+            this.updatedAt = Date.now();
+            return this.isPinned;
+        }
+    }
+
     // === IndexedDB 存储管理类 ===
     class ChatStorage {
         constructor() {
@@ -374,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 加载当前会话
         async loadCurrentConversation() {
-            const currentId = localStorage.getItem(CURRENT_CONVERSATION);
+            const currentId = localStorage.getItem(STORAGE_KEYS.CURRENT_CONVERSATION);
             if (currentId) {
                 const conversation = await chatStorage.getConversation(currentId);
                 if (conversation) {
@@ -403,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.currentConversation = conversation;
                 this.conversations.unshift(conversation);
                 
-                localStorage.setItem(CURRENT_CONVERSATION, conversation.id);
+                localStorage.setItem(STORAGE_KEYS.CURRENT_CONVERSATION, conversation.id);
                 
                 this.renderConversationList();
                 this.updateUI();
@@ -430,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 this.currentConversation = conversation;
-                localStorage.setItem(CURRENT_CONVERSATION, conversationId);
+                localStorage.setItem(STORAGE_KEYS.CURRENT_CONVERSATION, conversationId);
                 
                 await this.loadConversationMessages(conversationId);
                 this.updateUI();
