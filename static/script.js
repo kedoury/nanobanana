@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const newTemplateContent = document.getElementById('new-template-content');
     const addTemplateBtn = document.getElementById('add-template-btn');
     const templatesList = document.getElementById('templates-list');
+    
+    // === 图库功能元素获取 ===
+    const galleryItems = document.querySelectorAll('.gallery-item');
 
     let selectedFiles = [];
 
@@ -297,6 +300,48 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('模板删除成功！');
     };
 
+    // === 图库功能 ===
+    async function selectGalleryImage(galleryItem) {
+        const imageName = galleryItem.dataset.image;
+        
+        // 切换选中状态的视觉效果
+        galleryItem.classList.toggle('selected');
+        
+        // 如果是取消选择，从selectedFiles中移除
+        if (!galleryItem.classList.contains('selected')) {
+            selectedFiles = selectedFiles.filter(file => file.name !== imageName);
+            // 移除对应的缩略图
+            const thumbnails = thumbnailsContainer.querySelectorAll('.thumbnail-wrapper');
+            thumbnails.forEach(thumbnail => {
+                const img = thumbnail.querySelector('img');
+                if (img && img.alt === imageName) {
+                    thumbnail.remove();
+                }
+            });
+            return;
+        }
+        
+        try {
+            // 获取图片并转换为File对象
+            const response = await fetch(imageName);
+            const blob = await response.blob();
+            
+            // 创建File对象，使用图片名称
+            const file = new File([blob], imageName, { type: blob.type });
+            
+            // 检查是否已经存在相同文件
+            if (!selectedFiles.some(f => f.name === file.name)) {
+                selectedFiles.push(file);
+                createThumbnail(file);
+            }
+        } catch (error) {
+            console.error('加载图库图片失败:', error);
+            alert('加载图片失败，请重试');
+            // 如果加载失败，取消选中状态
+            galleryItem.classList.remove('selected');
+        }
+    }
+    
     // === 工具函数 ===
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -330,6 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Escape' && !templateModal.classList.contains('hidden')) {
                 closeTemplateModal();
             }
+        });
+        
+        // 图库功能事件
+        galleryItems.forEach(item => {
+            item.addEventListener('click', () => selectGalleryImage(item));
         });
     }
 
@@ -395,6 +445,12 @@ document.addEventListener('DOMContentLoaded', () => {
             removeBtn.onclick = () => {
                 selectedFiles = selectedFiles.filter(f => f.name !== file.name);
                 wrapper.remove();
+                
+                // 如果删除的是图库中的图片，取消对应图库项的选中状态
+                const galleryItem = document.querySelector(`[data-image="${file.name}"]`);
+                if (galleryItem) {
+                    galleryItem.classList.remove('selected');
+                }
             };
             
             wrapper.appendChild(img);
