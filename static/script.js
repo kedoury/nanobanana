@@ -371,8 +371,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 移除之前的尺寸模板文件（如果存在）
         selectedFiles = selectedFiles.filter(f => !f.name.match(/^(169|11|916)\.jpg$/));
         
-        // 将尺寸模板文件添加到列表开头
-        selectedFiles.unshift(file);
+        // 将尺寸模板文件添加到列表末尾（作为Figure 2）
+        // 这样用户原图就是Figure 1，尺寸模板图片就是Figure 2
+        selectedFiles.push(file);
         
         // 重新渲染缩略图
         refreshThumbnails();
