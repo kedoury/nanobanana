@@ -8,7 +8,27 @@ function createJsonErrorResponse(message: string, statusCode = 500) { /* ... */ 
 // --- 核心业务逻辑：调用 OpenRouter ---
 async function callOpenRouter(messages: any[], apiKey: string): Promise<{ type: 'image' | 'text'; content: string }> {
     if (!apiKey) { throw new Error("callOpenRouter received an empty apiKey."); }
-    const openrouterPayload = { model: "google/gemini-2.5-flash-image-preview", messages };
+    
+    // 优化提示词，确保模型明确知道需要生成图片
+    const optimizedMessages = messages.map((msg, index) => {
+        if (msg.role === 'user' && index === messages.length - 1) {
+            // 为最后一条用户消息添加明确的图片生成指令
+            const textContent = msg.content.find(c => c.type === 'text');
+            if (textContent) {
+                const hasImages = msg.content.some(c => c.type === 'image_url');
+                if (!hasImages) {
+                    // 纯文字生成图片的情况
+                    textContent.text = `请根据以下描述生成一张图片（不要只是描述，要实际生成图片）：${textContent.text}`;
+                } else {
+                    // 有图片输入的情况
+                    textContent.text = `${textContent.text}（请生成图片作为回应，不要只是文字描述）`;
+                }
+            }
+        }
+        return msg;
+    });
+    
+    const openrouterPayload = { model: "google/gemini-2.5-flash-image-preview", messages: optimizedMessages };
     console.log("Sending SMARTLY EXTRACTED payload to OpenRouter:", JSON.stringify(openrouterPayload, null, 2));
     const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST", headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -21,9 +41,85 @@ async function callOpenRouter(messages: any[], apiKey: string): Promise<{ type: 
     const responseData = await apiResponse.json();
     console.log("OpenRouter Response:", JSON.stringify(responseData, null, 2));
     const message = responseData.choices?.[0]?.message;
-    if (message?.images?.[0]?.image_url?.url) { return { type: 'image', content: message.images[0].image_url.url }; }
-    if (typeof message?.content === 'string' && message.content.startsWith('data:image/')) { return { type: 'image', content: message.content }; }
-    if (typeof message?.content === 'string' && message.content.trim() !== '') { return { type: 'text', content: message.content }; }
+    
+    // 检查图片的辅助函数
+    const checkForImage = (msg: any) => {
+        // 1. 检查 images 数组
+        if (msg?.images?.[0]?.image_url?.url) { 
+            return { type: 'image', content: msg.images[0].image_url.url }; 
+        }
+        
+        // 2. 检查 content 是否是 base64 图片
+        if (typeof msg?.content === 'string' && msg.content.startsWith('data:image/')) { 
+            return { type: 'image', content: msg.content }; 
+        }
+        
+        // 3. 检查 content 中是否包含 base64 图片数据
+        if (typeof msg?.content === 'string') {
+            const base64Match = msg.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+\/=]+/);
+            if (base64Match) {
+                return { type: 'image', content: base64Match[0] };
+            }
+        }
+        
+        // 4. 检查是否有其他图片相关字段
+        if (msg?.image || msg?.image_url) {
+            const imageUrl = msg.image || msg.image_url;
+            return { type: 'image', content: imageUrl };
+        }
+        
+        return null;
+    };
+    
+    // 首先检查是否返回了图片
+    const imageResult = checkForImage(message);
+    if (imageResult) {
+        return imageResult;
+    }
+    
+    // 如果没有返回图片，但用户明确要求生成图片，则进行重试
+    const userMessage = optimizedMessages[optimizedMessages.length - 1];
+    const isImageGenerationRequest = userMessage?.content?.some((c: any) => 
+        c.type === 'text' && (c.text.includes('生成') || c.text.includes('创作') || c.text.includes('画') || c.text.includes('绘制'))
+    );
+    
+    if (isImageGenerationRequest && typeof message?.content === 'string') {
+        console.log("模型返回了文字而不是图片，尝试重试...");
+        
+        // 创建更强烈的重试提示词
+        const retryMessages = [...optimizedMessages];
+        const lastMessage = retryMessages[retryMessages.length - 1];
+        const textContent = lastMessage.content.find((c: any) => c.type === 'text');
+        if (textContent) {
+            textContent.text = `IMPORTANT: You must generate an actual image, not text description. ${textContent.text}. Please create and return an image file, not words about an image.`;
+        }
+        
+        // 重试请求
+        const retryPayload = { model: "google/gemini-2.5-flash-image-preview", messages: retryMessages };
+        console.log("Retrying with stronger prompt...");
+        
+        const retryResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST", headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify(retryPayload)
+        });
+        
+        if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            console.log("Retry Response:", JSON.stringify(retryData, null, 2));
+            const retryMessage = retryData.choices?.[0]?.message;
+            
+            const retryImageResult = checkForImage(retryMessage);
+            if (retryImageResult) {
+                return retryImageResult;
+            }
+        }
+    }
+    
+    // 如果重试后仍然没有图片，返回文字内容
+    if (typeof message?.content === 'string' && message.content.trim() !== '') { 
+        return { type: 'text', content: message.content }; 
+    }
+    
     return { type: 'text', content: "[模型没有返回有效内容]" };
 }
 
