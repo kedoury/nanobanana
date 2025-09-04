@@ -100,11 +100,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // 计算消息大小
         calculateSize() {
             let size = new Blob([this.content]).size;
-            this.images.forEach(img => {
-                if (img.data) {
-                    size += img.data.length * 0.75; // Base64编码大约增加33%
-                }
-            });
+            if (this.images && Array.isArray(this.images)) {
+                this.images.forEach(img => {
+                    if (img.data) {
+                        size += img.data.length * 0.75; // Base64编码大约增加33%
+                    }
+                });
+            }
             return size;
         }
         
@@ -1465,7 +1467,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     totalSize += JSON.stringify(conversation).length * 2; // UTF-16编码，每字符2字节
                     
                     // 获取会话消息
-                    const messages = await chatStorage.getMessages(conversation.id);
+                    const messages = await chatStorage.getConversationMessages(conversation.id);
                     messageCount += messages.length;
                     
                     for (const message of messages) {
@@ -1648,7 +1650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 for (const conversation of conversations) {
-                    const messages = await chatStorage.getMessages(conversation.id);
+                    const messages = await chatStorage.getConversationMessages(conversation.id);
                     
                     // 过滤消息（按日期范围）
                     let filteredMessages = messages;
