@@ -226,7 +226,23 @@ serve(async (req) => {
         }
     }
 
-    // --- 路由 3: 你的 Web UI (nano banana) ---
+    // --- 路由 3: 获取环境变量中的API密钥 (为前端自动填充) ---
+    if (pathname === "/api/get-env-key") {
+        try {
+            const envApiKey = Deno.env.get("OPENROUTER_API_KEY");
+            return new Response(JSON.stringify({ 
+                hasEnvKey: !!envApiKey,
+                apiKey: envApiKey || null 
+            }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        } catch (error) {
+            return createJsonErrorResponse("Failed to get environment API key", 500);
+        }
+    }
+
+    // --- 路由 4: 你的 Web UI (nano banana) ---
     if (pathname === "/generate") {
         try {
             const { prompt, images, apikey } = await req.json();
