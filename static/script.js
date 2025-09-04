@@ -3,14 +3,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadArea = document.querySelector('.upload-area');
     const fileInput = document.getElementById('image-upload');
     const thumbnailsContainer = document.getElementById('thumbnails-container');
+    const promptInput = document.getElementById('prompt-input');
     const apiKeyInput = document.getElementById('api-key-input');
-    
-    // 检查元素是否存在，避免null错误
-    const promptInput = document.getElementById('prompt-input'); // 可能不存在
-    const generateBtn = document.getElementById('generate-btn'); // 可能不存在
-    const btnText = generateBtn ? generateBtn.querySelector('.btn-text') : null;
-    const spinner = generateBtn ? generateBtn.querySelector('.spinner') : null;
-    const resultContainer = document.getElementById('result-image-container'); // 可能不存在
+    const generateBtn = document.getElementById('generate-btn');
+    const btnText = generateBtn.querySelector('.btn-text');
+    const spinner = generateBtn.querySelector('.spinner');
+    const resultContainer = document.getElementById('result-image-container');
 
     // === 新功能元素获取 ===
     const rememberKeyCheckbox = document.getElementById('remember-key-checkbox');
@@ -25,116 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const addTemplateBtn = document.getElementById('add-template-btn');
     const templatesList = document.getElementById('templates-list');
 
-    // === 聊天界面元素获取 ===
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInput = document.getElementById('chat-input');
-    const sendMessageBtn = document.getElementById('send-message-btn');
-    const attachImageBtn = document.getElementById('attach-image-btn');
-    const clearChatBtn = document.getElementById('clear-chat-btn');
-    const exportChatBtn = document.getElementById('export-chat-btn');
-    const togglePanelBtn = document.getElementById('toggle-panel-btn');
-    const controlsPanel = document.querySelector('.controls-panel');
-    
-    // 检查聊天功能是否可用
-    const isChatAvailable = chatMessages && chatInput && sendMessageBtn;
-
     let selectedFiles = [];
-    let chatManager = new ChatManager();
-    let currentChatImages = []; // 当前聊天中选择的图片
 
     // === 本地存储键名常量 ===
     const STORAGE_KEYS = {
         API_KEY: 'nanobanana_api_key',
         REMEMBER_KEY: 'nanobanana_remember_key',
-        TEMPLATES: 'nanobanana_templates',
-        CHAT_HISTORY: 'nanobanana_chat_history'
+        TEMPLATES: 'nanobanana_templates'
     };
-
-    // === 聊天数据结构 ===
-    class ChatMessage {
-        constructor(role, content, images = [], timestamp = null) {
-            this.id = Date.now() + Math.random(); // 唯一标识符
-            this.role = role; // 'user' 或 'assistant'
-            this.content = content; // 文本内容
-            this.images = images; // 图片数组 [{url, name, base64}]
-            this.timestamp = timestamp || new Date().toISOString();
-            this.status = 'sent'; // 'sending', 'sent', 'error'
-        }
-    }
-
-    // === 聊天管理类 ===
-    class ChatManager {
-        constructor() {
-            this.messages = [];
-            this.loadChatHistory();
-        }
-
-        // 添加消息
-        addMessage(role, content, images = []) {
-            const message = new ChatMessage(role, content, images);
-            this.messages.push(message);
-            this.saveChatHistory();
-            return message;
-        }
-
-        // 获取所有消息
-        getAllMessages() {
-            return this.messages;
-        }
-
-        // 获取上下文消息（用于API调用）
-        getContextMessages(maxMessages = 10) {
-            // 返回最近的消息，用于维持对话上下文
-            return this.messages.slice(-maxMessages).map(msg => ({
-                role: msg.role,
-                content: msg.content,
-                images: msg.images
-            }));
-        }
-
-        // 清空聊天记录
-        clearChat() {
-            this.messages = [];
-            this.saveChatHistory();
-        }
-
-        // 删除单条消息
-        deleteMessage(messageId) {
-            this.messages = this.messages.filter(msg => msg.id !== messageId);
-            this.saveChatHistory();
-        }
-
-        // 保存聊天记录到本地存储
-        saveChatHistory() {
-            try {
-                localStorage.setItem(STORAGE_KEYS.CHAT_HISTORY, JSON.stringify(this.messages));
-            } catch (e) {
-                console.error('无法保存聊天记录:', e);
-            }
-        }
-
-        // 从本地存储加载聊天记录
-        loadChatHistory() {
-            try {
-                const stored = localStorage.getItem(STORAGE_KEYS.CHAT_HISTORY);
-                if (stored) {
-                    this.messages = JSON.parse(stored);
-                }
-            } catch (e) {
-                console.warn('无法加载聊天记录:', e);
-                this.messages = [];
-            }
-        }
-
-        // 导出聊天记录
-        exportChat() {
-            const exportData = {
-                timestamp: new Date().toISOString(),
-                messages: this.messages
-            };
-            return JSON.stringify(exportData, null, 2);
-        }
-    }
 
     // === 预设模板数据 ===
     // 默认模板已清空，用户可以自行添加模板
@@ -145,84 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadSavedApiKey();
         initializeTemplates();
         loadTemplateOptions();
-        initializeChatUI();
         bindEventListeners();
-    }
-
-    // === 聊天界面初始化 ===
-    function initializeChatUI() {
-        // 检查聊天功能是否可用
-        if (!isChatAvailable) {
-            console.log('聊天功能不可用，跳过聊天界面初始化');
-            return;
-        }
-        
-        // 加载历史聊天记录
-        renderChatHistory();
-        // 滚动到底部
-        scrollToBottom();
-    }
-
-    // === 渲染聊天历史 ===
-    function renderChatHistory() {
-        if (!chatMessages) return; // 检查聊天容器是否存在
-        
-        const messages = chatManager.getAllMessages();
-        
-        // 清空聊天容器（保留欢迎消息）
-        const welcomeMessage = chatMessages.querySelector('.welcome-message');
-        chatMessages.innerHTML = '';
-        
-        if (messages.length === 0) {
-            // 如果没有历史消息，显示欢迎消息
-            if (welcomeMessage) {
-                chatMessages.appendChild(welcomeMessage);
-            }
-        } else {
-            // 渲染所有历史消息
-            messages.forEach(message => {
-                renderMessage(message);
-            });
-        }
-    }
-
-    // === 渲染单条消息 ===
-    function renderMessage(message) {
-        if (!chatMessages) return; // 检查聊天容器是否存在
-        
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.role}`;
-        messageDiv.dataset.messageId = message.id;
-
-        let imagesHtml = '';
-        if (message.images && message.images.length > 0) {
-            const imagesContainer = message.role === 'user' ? 
-                '<div class="message-images">' : '<div class="message-images">';
-            imagesHtml = imagesContainer + 
-                message.images.map(img => 
-                    `<img src="${img.url}" alt="${img.name}" class="message-image" onclick="openImagePreview('${img.url}')">`
-                ).join('') + '</div>';
-        }
-
-        const timeStr = new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        messageDiv.innerHTML = `
-            ${message.role === 'user' ? imagesHtml : ''}
-            <div class="message-content">${message.content}</div>
-            ${message.role === 'assistant' ? imagesHtml : ''}
-            <div class="message-time">${timeStr}</div>
-        `;
-
-        chatMessages.appendChild(messageDiv);
-    }
-
-    // === 滚动到底部 ===
-    function scrollToBottom() {
-        if (!chatMessages) return; // 检查聊天容器是否存在
-        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     // === 密钥记忆功能 ===
@@ -462,31 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModalBtn.addEventListener('click', closeTemplateModal);
         addTemplateBtn.addEventListener('click', addNewTemplate);
         
-        // 聊天功能事件 - 添加可用性检查
-        if (isChatAvailable) {
-            sendMessageBtn.addEventListener('click', sendChatMessage);
-            if (attachImageBtn && fileInput) {
-                attachImageBtn.addEventListener('click', () => fileInput.click());
-            }
-            if (clearChatBtn) {
-                clearChatBtn.addEventListener('click', clearChatHistory);
-            }
-            if (exportChatBtn) {
-                exportChatBtn.addEventListener('click', exportChatHistory);
-            }
-            if (togglePanelBtn) {
-                togglePanelBtn.addEventListener('click', toggleControlsPanel);
-            }
-            
-            // 聊天输入框事件
-            chatInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendChatMessage();
-                }
-            });
-        }
-        
         // 模态框背景点击关闭
         templateModal.addEventListener('click', (e) => {
             if (e.target === templateModal) {
@@ -505,43 +299,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // === 启动应用 ===
     initializeApp();
 
-    // 拖放功能 - 添加null检查
-    if (uploadArea) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, preventDefaults, false);
-        });
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, () => {
-                uploadArea.classList.add('drag-over');
-            });
-        });
-    }
+    // 拖放功能
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+    });
 
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
 
-    if (uploadArea) {
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, () => {
-                uploadArea.classList.remove('drag-over');
-            });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.add('drag-over');
         });
+    });
 
-        uploadArea.addEventListener('drop', (e) => {
-            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
-            handleFiles(files);
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.remove('drag-over');
         });
-    }
+    });
 
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
-            handleFiles(files);
-        });
-    }
+    uploadArea.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+        handleFiles(files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+        handleFiles(files);
+    });
 
     function handleFiles(files) {
         files.forEach(file => {
@@ -553,8 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createThumbnail(file) {
-        if (!thumbnailsContainer) return; // 如果容器不存在则直接返回
-        
         const reader = new FileReader();
         reader.onload = (e) => {
             const wrapper = document.createElement('div');
@@ -740,212 +526,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('请选择有效的JSON文件');
                 return;
             }
-            importUserData(file);
-        }
-    }
-
-    // === 聊天功能实现 ===
-    
-    // 发送聊天消息
-    async function sendChatMessage() {
-        const message = chatInput.value.trim();
-        if (!message && currentChatImages.length === 0) {
-            alert('请输入消息或上传图片');
-            return;
-        }
-
-        const apiKey = apiKeyInput.value.trim();
-        if (!apiKey) {
-            alert('请先输入API密钥');
-            return;
-        }
-
-        // 禁用发送按钮
-        sendMessageBtn.disabled = true;
-        sendMessageBtn.textContent = '发送中...';
-        
-        try {
-            // 创建用户消息
-            const userMessage = new ChatMessage('user', message, [...currentChatImages]);
-            chatManager.addMessage(userMessage);
-            renderMessage(userMessage);
             
-            // 清空输入
-            chatInput.value = '';
-            currentChatImages = [];
-            updateImagePreview();
-            
-            // 显示AI思考状态
-            showTypingIndicator();
-            
-            // 准备API请求数据
-            const chatHistory = chatManager.getMessages();
-            const messages = chatHistory.map(msg => ({
-                role: msg.role,
-                content: msg.images && msg.images.length > 0 ? [
-                    { type: 'text', text: msg.content },
-                    ...msg.images.map(img => ({
-                        type: 'image_url',
-                        image_url: { url: img }
-                    }))
-                ] : msg.content
-            }));
-
-            // 发送API请求
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    messages: messages,
-                    apiKey: apiKey
-                })
+            importUserData(file).finally(() => {
+                // 清空文件输入，允许重复选择同一文件
+                input.value = '';
             });
-
-            if (!response.ok) {
-                throw new Error(`API请求失败: ${response.status}`);
-            }
-
-            const data = await response.json();
-            
-            // 隐藏思考状态
-            hideTypingIndicator();
-            
-            // 创建AI回复消息
-            const aiMessage = new ChatMessage('assistant', data.content);
-            chatManager.addMessage(aiMessage);
-            renderMessage(aiMessage);
-            
-        } catch (error) {
-            console.error('发送消息失败:', error);
-            hideTypingIndicator();
-            
-            // 创建错误消息
-            const errorMessage = new ChatMessage('assistant', `抱歉，发生了错误：${error.message}`);
-            chatManager.addMessage(errorMessage);
-            renderMessage(errorMessage);
-        } finally {
-            // 恢复发送按钮
-            sendMessageBtn.disabled = false;
-            sendMessageBtn.textContent = '发送';
-            scrollToBottom();
         }
     }
-    
-    // 显示AI思考指示器
-    function showTypingIndicator() {
-        const indicator = document.createElement('div');
-        indicator.className = 'message ai-message typing-indicator';
-        indicator.id = 'typing-indicator';
-        indicator.innerHTML = `
-            <div class="message-content">
-                <div class="typing-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-            </div>
-        `;
-        chatMessages.appendChild(indicator);
-        scrollToBottom();
-    }
-    
-    // 隐藏AI思考指示器
-    function hideTypingIndicator() {
-        const indicator = document.getElementById('typing-indicator');
-        if (indicator) {
-            indicator.remove();
-        }
-    }
-    
-    // 清空聊天记录
-    function clearChatHistory() {
-        if (!confirm('确定要清空所有聊天记录吗？此操作不可撤销。')) {
-            return;
-        }
-        
-        chatManager.clearHistory();
-        chatMessages.innerHTML = '';
-        currentChatImages = [];
-        updateImagePreview();
-        alert('聊天记录已清空');
-    }
-    
-    // 导出聊天记录
-    function exportChatHistory() {
-        try {
-            const chatData = {
-                version: '1.0',
-                exportDate: new Date().toISOString(),
-                messages: chatManager.getMessages(),
-                totalMessages: chatManager.getMessages().length
-            };
-            
-            const blob = new Blob([JSON.stringify(chatData, null, 2)], {
-                type: 'application/json'
-            });
-            
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `chat-history-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            alert('聊天记录导出成功！');
-        } catch (error) {
-            console.error('导出聊天记录失败:', error);
-            alert('导出聊天记录失败，请重试。');
-        }
-    }
-    
-    // 切换控制面板显示/隐藏
-    function toggleControlsPanel() {
-        const controlsPanel = document.querySelector('.controls-panel');
-        controlsPanel.classList.toggle('hidden');
-        
-        const isHidden = controlsPanel.classList.contains('hidden');
-        togglePanelBtn.textContent = isHidden ? '显示控制面板' : '隐藏控制面板';
-    }
-    
-    // 更新图片预览
-    function updateImagePreview() {
-        const previewContainer = document.querySelector('.image-preview');
-        if (!previewContainer) {
-            // 如果预览容器不存在，创建一个
-            const container = document.createElement('div');
-            container.className = 'image-preview';
-            chatInput.parentNode.insertBefore(container, chatInput);
-        }
-        
-        const preview = document.querySelector('.image-preview');
-        preview.innerHTML = '';
-        
-        currentChatImages.forEach((imageData, index) => {
-            const imgContainer = document.createElement('div');
-            imgContainer.className = 'preview-image';
-            imgContainer.innerHTML = `
-                <img src="${imageData}" alt="预览图片 ${index + 1}">
-                <button onclick="removeImage(${index})" class="remove-btn">×</button>
-            `;
-            preview.appendChild(imgContainer);
-        });
-    }
-    
-    // 移除图片
-    window.removeImage = function(index) {
-        currentChatImages.splice(index, 1);
-        updateImagePreview();
-    };
-
-    // 将聊天功能函数暴露到全局
-    window.sendChatMessage = sendChatMessage;
-    window.clearChatHistory = clearChatHistory;
-    window.exportChatHistory = exportChatHistory;
-    window.toggleControlsPanel = toggleControlsPanel;
 
     // 将导出导入函数暴露到全局，供HTML调用
     window.exportUserData = exportUserData;
