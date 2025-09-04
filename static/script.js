@@ -33,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // === 预设模板数据 ===
-    // 默认模板已清空，用户可以自行添加模板
     const DEFAULT_TEMPLATES = [];
 
     // === 初始化函数 ===
@@ -84,10 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 模板管理功能 ===
     function initializeTemplates() {
-        // 直接加载已保存的模板，不再自动添加默认模板
-        // 用户可以通过界面手动添加需要的模板
-        const templates = getStoredTemplates();
-        // 模板为空时不做任何操作，让用户自行管理
+        let templates = getStoredTemplates();
+        
+        // 如果没有保存的模板，使用默认模板
+        if (templates.length === 0) {
+            templates = DEFAULT_TEMPLATES;
+            saveTemplates(templates);
+        }
     }
 
     function getStoredTemplates() {
@@ -372,10 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (selectedFiles.length === 0) {
-            alert('请选择至少一张图片');
-            return;
-        }
+        // 图片上传现在是可选的，支持纯文字生成图片
+        // if (selectedFiles.length === 0) {
+        //     alert('请选择至少一张图片');
+        //     return;
+        // }
 
         if (!promptInput.value.trim()) {
             alert('请输入提示词');
@@ -385,11 +388,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoading(true);
 
         try {
-            // 1. 创建一个 Promise 数组，用于将所有选中的文件转换为 Base64
-            const conversionPromises = selectedFiles.map(file => fileToBase64(file));
-            
-            // 2. 等待所有文件转换完成
-            const base64Images = await Promise.all(conversionPromises);
+            // 1. 处理图片转换（如果有选择图片的话）
+            let base64Images = [];
+            if (selectedFiles.length > 0) {
+                // 创建一个 Promise 数组，用于将所有选中的文件转换为 Base64
+                const conversionPromises = selectedFiles.map(file => fileToBase64(file));
+                // 等待所有文件转换完成
+                base64Images = await Promise.all(conversionPromises);
+            }
             
             // 3. 发送包含 images 数组的请求
             const response = await fetch('/generate', {
@@ -442,100 +448,4 @@ document.addEventListener('DOMContentLoaded', () => {
         img.alt = 'Generated image';
         resultContainer.appendChild(img);
     }
-
-    // === 数据持久化功能 ===
-    // 导出用户数据（API密钥和模板）
-    function exportUserData() {
-        try {
-            const userData = {
-                apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || '',
-                rememberKey: localStorage.getItem(STORAGE_KEYS.REMEMBER_KEY) || 'false',
-                templates: getStoredTemplates(),
-                exportDate: new Date().toISOString(),
-                version: '1.0'
-            };
-
-            const dataStr = JSON.stringify(userData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = `nanobanana-backup-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            alert('数据导出成功！文件已下载到您的下载文件夹。');
-        } catch (error) {
-            console.error('导出数据失败:', error);
-            alert('导出数据失败，请重试。');
-        }
-    }
-
-    // 导入用户数据
-    function importUserData(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const userData = JSON.parse(e.target.result);
-                    
-                    // 验证数据格式
-                    if (!userData.version || !userData.exportDate) {
-                        throw new Error('无效的备份文件格式');
-                    }
-
-                    // 恢复API密钥设置
-                    if (userData.apiKey) {
-                        localStorage.setItem(STORAGE_KEYS.API_KEY, userData.apiKey);
-                    }
-                    if (userData.rememberKey) {
-                        localStorage.setItem(STORAGE_KEYS.REMEMBER_KEY, userData.rememberKey);
-                    }
-
-                    // 恢复模板数据
-                    if (userData.templates && Array.isArray(userData.templates)) {
-                        saveTemplates(userData.templates);
-                    }
-
-                    // 重新加载界面
-                    loadSavedApiKey();
-                    loadTemplateOptions();
-                    
-                    alert(`数据导入成功！\n导出时间: ${new Date(userData.exportDate).toLocaleString()}\n模板数量: ${userData.templates ? userData.templates.length : 0}`);
-                    resolve();
-                } catch (error) {
-                    console.error('导入数据失败:', error);
-                    alert('导入数据失败：' + error.message);
-                    reject(error);
-                }
-            };
-            reader.onerror = () => {
-                alert('读取文件失败，请重试。');
-                reject(new Error('文件读取失败'));
-            };
-            reader.readAsText(file);
-        });
-    }
-
-    // 处理文件导入的辅助函数
-    function handleImportFile(input) {
-        const file = input.files[0];
-        if (file) {
-            if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-                alert('请选择有效的JSON文件');
-                return;
-            }
-            
-            importUserData(file).finally(() => {
-                // 清空文件输入，允许重复选择同一文件
-                input.value = '';
-            });
-        }
-    }
-
-    // 将导出导入函数暴露到全局，供HTML调用
-    window.exportUserData = exportUserData;
-    window.importUserData = importUserData;
-    window.handleImportFile = handleImportFile;
 });
