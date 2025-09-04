@@ -136,9 +136,17 @@ serve(async (req) => {
             const { prompt, images, apikey } = await req.json();
             const openrouterApiKey = apikey || Deno.env.get("OPENROUTER_API_KEY");
             if (!openrouterApiKey) { return new Response(JSON.stringify({ error: "OpenRouter API key is not set." }), { status: 500 }); }
-            if (!prompt || !images || !images.length) { return new Response(JSON.stringify({ error: "Prompt and images are required." }), { status: 400 }); }
+            if (!prompt) { return new Response(JSON.stringify({ error: "Prompt is required." }), { status: 400 }); }
+            // images 现在是可选的，支持纯文字生成图片
+            if (!images) images = []; // 如果没有提供images，设置为空数组
             
-            const webUiMessages = [ { role: "user", content: [ {type: "text", text: prompt}, ...images.map(img => ({type: "image_url", image_url: {url: img}})) ] } ];
+            // 根据是否有图片构建不同的消息格式
+            let messageContent = [{type: "text", text: prompt}];
+            if (images.length > 0) {
+                // 有图片时，添加图片到消息内容中
+                messageContent.push(...images.map(img => ({type: "image_url", image_url: {url: img}})));
+            }
+            const webUiMessages = [ { role: "user", content: messageContent } ];
             
             // --- 这里是修改的关键 ---
             const result = await callOpenRouter(webUiMessages, openrouterApiKey);
