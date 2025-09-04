@@ -1,170 +1,191 @@
-import { serve } from "https://deno.land/std@0.200.0/http/server.ts";
-import { serveDir } from "https://deno.land/std@0.200.0/http/file_server.ts";
-import { Buffer } from "https://deno.land/std@0.177.0/node/buffer.ts";
+// main.ts — for Deno Deploy
+// 目标：稳妥转发到 OpenRouter；带齐 headers；错误做 JSON 封装；对偶发 1105/网络波动做有限重试；统一 CORS。
 
-// --- 辅助函数：生成错误 JSON 响应 ---
-function createJsonErrorResponse(message: string, statusCode = 500) { /* ... */ }
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"; // 或换成 /responses
+const DEF_MODEL = "openai/gpt-4o-mini"; // 你常用的模型，前端可覆盖
 
-// --- 核心业务逻辑：调用 OpenRouter ---
-async function callOpenRouter(messages: any[], apiKey: string): Promise<{ type: 'image' | 'text'; content: string }> {
-    if (!apiKey) { throw new Error("callOpenRouter received an empty apiKey."); }
-    const openrouterPayload = { model: "google/gemini-2.5-flash-image-preview", messages };
-    console.log("Sending SMARTLY EXTRACTED payload to OpenRouter:", JSON.stringify(openrouterPayload, null, 2));
-    const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST", headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(openrouterPayload)
-    });
-    if (!apiResponse.ok) {
-        const errorBody = await apiResponse.text();
-        throw new Error(`OpenRouter API error: Unauthorized - ${errorBody}`);
-    }
-    const responseData = await apiResponse.json();
-    console.log("OpenRouter Response:", JSON.stringify(responseData, null, 2));
-    const message = responseData.choices?.[0]?.message;
-    if (message?.images?.[0]?.image_url?.url) { return { type: 'image', content: message.images[0].image_url.url }; }
-    if (typeof message?.content === 'string' && message.content.startsWith('data:image/')) { return { type: 'image', content: message.content }; }
-    if (typeof message?.content === 'string' && message.content.trim() !== '') { return { type: 'text', content: message.content }; }
-    return { type: 'text', content: "[模型没有返回有效内容]" };
+// ---- 小工具：CORS 头 ----
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type,Authorization,X-Requested-With,Accept",
+  "Vary": "Origin",
+};
+
+// ---- 小工具：JSON 响应 ----
+function json(
+  data: unknown,
+  status = 200,
+  extra: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CORS_HEADERS, ...extra },
+  });
 }
 
-// --- 主服务逻辑 ---
-serve(async (req) => {
-    const pathname = new URL(req.url).pathname;
-    
-    if (req.method === 'OPTIONS') { return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization, x-goog-api-key" } }); }
+// ---- 小工具：睡眠 ----
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    // --- 路由 1: Cherry Studio (Gemini, 流式) ---
-    if (pathname.includes(":streamGenerateContent")) {
-        try {
-            const geminiRequest = await req.json();
-            let apiKey = req.headers.get("Authorization")?.replace("Bearer ", "") || req.headers.get("x-goog-api-key") || "";
-            if (!apiKey) { return createJsonErrorResponse("API key is missing.", 401); }
-            if (!geminiRequest.contents?.length) { return createJsonErrorResponse("Invalid request: 'contents' array is missing.", 400); }
-            
-            // --- 智能提取逻辑 ---
-            const fullHistory = geminiRequest.contents;
-            const lastUserMessageIndex = fullHistory.findLastIndex((msg: any) => msg.role === 'user');
-            let relevantHistory = (lastUserMessageIndex !== -1) ? fullHistory.slice(fullHistory.findLastIndex((msg: any, idx: number) => msg.role === 'model' && idx < lastUserMessageIndex), lastUserMessageIndex + 1) : [];
-            if (relevantHistory.length === 0 && lastUserMessageIndex !== -1) relevantHistory = [fullHistory[lastUserMessageIndex]];
-            if (relevantHistory.length === 0) return createJsonErrorResponse("No user message found.", 400);
+// ---- 核心：带重试的 fetch（对偶发 1105、502、网络抖动更稳）----
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retry = 2,
+  baseDelay = 300,
+): Promise<Response> {
+  let lastErr: unknown = null;
 
-            const openrouterMessages = relevantHistory.map((geminiMsg: any) => {
-                const parts = geminiMsg.parts.map((p: any) => p.text ? {type: "text", text: p.text} : {type: "image_url", image_url: {url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`}});
-                return { role: geminiMsg.role === 'model' ? 'assistant' : 'user', content: parts };
-            });
-            
-            // --- 简化后的流处理 ---
-            const stream = new ReadableStream({
-                async start(controller) {
-                    try {
-                        const openRouterResult = await callOpenRouter(openrouterMessages, apiKey);
-                        const sendChunk = (data: object) => controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`));
-                        
-                        let textToStream = (openRouterResult.type === 'image') ? "好的，图片已生成：" : openRouterResult.content;
-                        for (const char of textToStream) {
-                            sendChunk({ candidates: [{ content: { role: "model", parts: [{ text: char }] } }] });
-                            await new Promise(r => setTimeout(r, 2));
-                        }
-                        
-                        if (openRouterResult.type === 'image') {
-                            const matches = openRouterResult.content.match(/^data:(.+);base64,(.*)$/);
-                            if (matches) {
-                                sendChunk({ candidates: [{ content: { role: "model", parts: [{ inlineData: { mimeType: matches[1], data: matches[2] } }] } }] });
-                            }
-                        }
-                        
-                        sendChunk({ candidates: [{ finishReason: "STOP", content: { role: "model", parts: [] } }], usageMetadata: { promptTokenCount: 264, totalTokenCount: 1578 } });
-                        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-                    } catch (e) {
-                        console.error("Error inside stream:", e);
-                        const errorChunk = { error: { message: e.message, code: 500 } };
-                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
-                    } finally {
-                        controller.close();
-                    }
-                }
-            });
-            return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*" } });
-        } catch (error) {
-            return createJsonErrorResponse(error.message, 500);
-        }
+  for (let i = 0; i <= retry; i++) {
+    try {
+      const res = await fetch(url, init);
+
+      // 1105/5xx/429 等可重试
+      const retriable =
+        res.status === 429 ||
+        res.status === 502 ||
+        res.status === 503 ||
+        res.status === 504 ||
+        // 部分边缘节点把 1105 写在文本里，这里只要不是 2xx 就考虑重试
+        (res.status >= 500 && res.status <= 599);
+
+      if (!retriable) return res;
+
+      if (i < retry) {
+        // 退避
+        await sleep(baseDelay * (i + 1));
+        continue;
+      }
+      return res; // 最后一次也返回给上层统一处理
+    } catch (e) {
+      lastErr = e;
+      if (i < retry) {
+        await sleep(baseDelay * (i + 1));
+        continue;
+      }
+      throw e;
     }
+  }
+  // 理论到不了这
+  throw lastErr ?? new Error("fetchWithRetry: unknown error");
+}
 
-    // --- 路由 2: Cherry Studio (Gemini, 非流式) ---
-    if (pathname.includes(":generateContent")) {
-        try {
-            const geminiRequest = await req.json();
-            let apiKey = req.headers.get("Authorization")?.replace("Bearer ", "") || req.headers.get("x-goog-api-key") || "";
-            if (!apiKey) { return createJsonErrorResponse("API key is missing.", 401); }
-            if (!geminiRequest.contents?.length) { return createJsonErrorResponse("Invalid request: 'contents' array is missing.", 400); }
+// ---- 解析请求体，容错 ----
+async function readJson(req: Request) {
+  try {
+    return await req.json();
+  } catch {
+    return {};
+  }
+}
 
-            const fullHistory = geminiRequest.contents;
-            const lastUserMessageIndex = fullHistory.findLastIndex((msg: any) => msg.role === 'user');
-            let relevantHistory = (lastUserMessageIndex !== -1) ? fullHistory.slice(fullHistory.findLastIndex((msg: any, idx: number) => msg.role === 'model' && idx < lastUserMessageIndex), lastUserMessageIndex + 1) : [];
-            if (relevantHistory.length === 0 && lastUserMessageIndex !== -1) relevantHistory = [fullHistory[lastUserMessageIndex]];
-            if (relevantHistory.length === 0) return createJsonErrorResponse("No user message found.", 400);
+// ---- 处理与 OpenRouter 的交互 ----
+async function handleChat(req: Request): Promise<Response> {
+  const body = await readJson(req);
 
-            const openrouterMessages = relevantHistory.map((geminiMsg: any) => {
-                const parts = geminiMsg.parts.map((p: any) => p.text ? {type: "text", text: p.text} : {type: "image_url", image_url: {url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`}});
-                return { role: geminiMsg.role === 'model' ? 'assistant' : 'user', content: parts };
-            });
-            
-            const openRouterResult = await callOpenRouter(openrouterMessages, apiKey);
+  // 1) API Key：优先 Authorization: Bearer xxx；然后 body.apiKey；最后 env
+  let authHeader = req.headers.get("Authorization") ?? "";
+  let apiKey = "";
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    apiKey = authHeader.slice(7).trim();
+  } else if (typeof body.apiKey === "string" && body.apiKey.trim()) {
+    apiKey = body.apiKey.trim();
+  } else {
+    apiKey = (Deno.env.get("OPENROUTER_API_KEY") ?? "").trim();
+  }
+  if (!apiKey) {
+    return json({ ok: false, error: "Missing OpenRouter API key." }, 401);
+  }
 
-            const finalParts = [];
-            if (openRouterResult.type === 'image') {
-                const matches = openRouterResult.content.match(/^data:(.+);base64,(.*)$/);
-                if (matches) {
-                    finalParts.push({ text: "好的，图片已生成：" });
-                    finalParts.push({ inlineData: { mimeType: matches[1], data: matches[2] } });
-                } else {
-                    finalParts.push({ text: "[图片生成失败]" });
-                }
-            } else {
-                finalParts.push({ text: openRouterResult.content });
-            }
-            const responsePayload = { candidates: [{ content: { role: "model", parts: finalParts }, finishReason: "STOP", index: 0 }], usageMetadata: { promptTokenCount: 264, totalTokenCount: 1578 } };
-            return new Response(JSON.stringify(responsePayload), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-        } catch (error) {
-            return createJsonErrorResponse(error.message, 500);
-        }
-    }
+  // 2) 组装消息体
+  const model = (body.model as string) || DEF_MODEL;
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const stream = !!body.stream; // 这里默认非流式，可由前端决定
 
-    // --- 路由 3: 你的 Web UI (nano banana) ---
-    if (pathname === "/generate") {
-        try {
-            const { prompt, images, apikey } = await req.json();
-            const openrouterApiKey = apikey || Deno.env.get("OPENROUTER_API_KEY");
-            if (!openrouterApiKey) { return new Response(JSON.stringify({ error: "OpenRouter API key is not set." }), { status: 500 }); }
-            if (!prompt || !images || !images.length) { return new Response(JSON.stringify({ error: "Prompt and images are required." }), { status: 400 }); }
-            
-            const webUiMessages = [ { role: "user", content: [ {type: "text", text: prompt}, ...images.map(img => ({type: "image_url", image_url: {url: img}})) ] } ];
-            
-            // --- 这里是修改的关键 ---
-            const result = await callOpenRouter(webUiMessages, openrouterApiKey);
-    
-            // 检查返回的是否是图片类型，并提取 content
-            if (result && result.type === 'image') {
-                // 返回给前端正确的 JSON 结构
-                return new Response(JSON.stringify({ imageUrl: result.content }), { 
-                    headers: { "Content-Type": "application/json" } 
-                });
-            } else {
-                // 如果模型意外地返回了文本或其他内容，则返回错误
-                const errorMessage = result ? `Model returned text instead of an image: ${result.content}` : "Model returned an empty response.";
-                console.error("Error handling /generate request:", errorMessage);
-                return new Response(JSON.stringify({ error: errorMessage }), { 
-                    status: 500, 
-                    headers: { "Content-Type": "application/json" } 
-                });
-            }
-            
-        } catch (error) {
-            console.error("Error handling /generate request:", error);
-            return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-        }
-    }
+  const upstreamPayload = {
+    model,
+    messages,
+    stream,
+    // 你也可以把其它 openrouter 字段透传，例如 route, provider等
+    // ...body.extra
+  };
 
-    // --- 路由 4: 静态文件服务 ---
-    return serveDir(req, { fsRoot: "static", urlRoot: "", showDirListing: true, enableCors: true });
+  // 3) 组装请求头（带齐标识，有助于通过 Cloudflare 检查）
+  const referer =
+    req.headers.get("origin") ??
+    new URL(req.url).origin ??
+    "https://your-deno-deploy-app.deno.dev";
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "Authorization": `Bearer ${apiKey}`,
+    // OpenRouter 推荐的两个标识头（可帮助通过风控、方便他们侧定位）：
+    "HTTP-Referer": referer,
+    "X-Title": "Nanobanana",
+    // 额外给一个 UA
+    "User-Agent": "Nanobanana/1.0 (deno-deploy)",
+  };
+
+  // 4) 请求上游（带重试）
+  let upstream: Response;
+  try {
+    upstream = await fetchWithRetry(OPENROUTER_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(upstreamPayload),
+    }, 2, 400);
+  } catch (e) {
+    return json({
+      ok: false,
+      status: 502,
+      upstream: "openrouter",
+      message: `Network error: ${(e as Error)?.message ?? String(e)}`,
+    }, 502);
+  }
+
+  // 5) 统一错误封装（避免把整页 HTML 透传给前端）
+  if (!upstream.ok) {
+    const text = await upstream.text();
+    // 尝试抽取 cf-ray 方便排查
+    const cfRay = upstream.headers.get("cf-ray") ?? undefined;
+
+    // 尝试识别是否是 HTML
+    const looksLikeHtml = /^\s*</.test(text);
+    const safeSnippet = (looksLikeHtml ? "[html-response] " : "") + text.slice(0, 800);
+
+    return json({
+      ok: false,
+      status: upstream.status,
+      upstream: "openrouter",
+      cfRay,
+      message: safeSnippet,
+    }, 502);
+  }
+
+  // 6) 成功：正常转 JSON（如果要做流式，在这里改为直接管道转发）
+  const data = await upstream.json();
+  return json({ ok: true, data }, 200);
+}
+
+// ---- 路由 ----
+Deno.serve(async (req: Request) => {
+  const { pathname } = new URL(req.url);
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  // 健康检查
+  if (req.method === "GET" && pathname === "/") {
+    return json({ ok: true, service: "nanobanana-proxy", ts: Date.now() });
+  }
+
+  // 对应你的前端调用路径（按你的项目改：如 /api/chat、/generate 等）
+  if (req.method === "POST" && (pathname === "/api/chat" || pathname === "/generate")) {
+    return await handleChat(req);
+  }
+
+  return json({ ok: false, error: "Not Found" }, 404);
 });
