@@ -130,54 +130,7 @@ serve(async (req) => {
         }
     }
 
-    // --- 路由 3: 聊天API (支持上下文对话) ---
-    if (pathname === "/api/chat") {
-        try {
-            const { messages, apiKey } = await req.json();
-            
-            if (!apiKey) {
-                return new Response(JSON.stringify({ error: "API密钥不能为空" }), { 
-                    status: 400, 
-                    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
-                });
-            }
-            
-            if (!messages || !Array.isArray(messages) || messages.length === 0) {
-                return new Response(JSON.stringify({ error: "消息历史不能为空" }), { 
-                    status: 400, 
-                    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
-                });
-            }
-            
-            // 调用OpenRouter API，传递完整的消息历史以支持上下文对话
-            const result = await callOpenRouter(messages, apiKey);
-            
-            // 返回AI回复内容
-            return new Response(JSON.stringify({ 
-                content: result.content,
-                type: result.type 
-            }), { 
-                headers: { 
-                    "Content-Type": "application/json", 
-                    "Access-Control-Allow-Origin": "*" 
-                } 
-            });
-            
-        } catch (error) {
-            console.error("聊天API错误:", error);
-            return new Response(JSON.stringify({ 
-                error: `聊天请求失败: ${error.message}` 
-            }), { 
-                status: 500, 
-                headers: { 
-                    "Content-Type": "application/json", 
-                    "Access-Control-Allow-Origin": "*" 
-                } 
-            });
-        }
-    }
-
-    // --- 路由 4: 你的 Web UI (nano banana) ---
+    // --- 路由 3: 你的 Web UI (nano banana) ---
     if (pathname === "/generate") {
         try {
             const { prompt, images, apikey } = await req.json();
@@ -212,6 +165,6 @@ serve(async (req) => {
         }
     }
 
-    // --- 路由 5: 静态文件服务 ---
+    // --- 路由 4: 静态文件服务 ---
     return serveDir(req, { fsRoot: "static", urlRoot: "", showDirListing: true, enableCors: true });
 });
