@@ -10,79 +10,20 @@
 <body>
     <h1 class="title">🍌 nano banana</h1>
     <p class="subtitle">(模型: google/gemini-2.5-flash-image-preview)</p>
-    <div class="app-container">
-        <!-- 左侧聊天记录区域 -->
-        <div class="chat-container">
-            <div class="chat-header">
-                <h2>💬 对话记录</h2>
-                <div class="chat-controls">
-                    <button type="button" id="clear-chat-btn" class="chat-control-btn" title="清空对话">🗑️</button>
-                    <button type="button" id="export-chat-btn" class="chat-control-btn" title="导出聊天记录">📤</button>
+    <div class="main-container">
+        <div class="controls-container">
+            <div class="api-key-section">
+                <h2>设置</h2>
+                <input type="password" id="api-key-input" placeholder="输入你的 OpenRouter API 密钥 (必填)">
+                <div class="api-key-controls">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="remember-key-checkbox">
+                        <span class="checkmark"></span>
+                        记住密钥
+                    </label>
+                    <button type="button" id="clear-key-btn" class="clear-btn">清除已保存密钥</button>
                 </div>
-            </div>
-            <div class="chat-messages" id="chat-messages">
-                <div class="welcome-message">
-                    <p>👋 欢迎使用 nano banana AI 助手！</p>
-                    <p>您可以上传图片并与AI进行多轮对话</p>
-                </div>
-            </div>
-            <div class="chat-input-area">
-                <div class="input-container">
-                    <textarea id="chat-input" placeholder="输入消息或选择图片开始对话..." rows="2"></textarea>
-                    <div class="input-actions">
-                        <button type="button" id="attach-image-btn" class="input-action-btn" title="添加图片">📎</button>
-                        <button type="button" id="send-message-btn" class="input-action-btn primary" title="发送消息">➤</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 右侧控制面板 -->
-        <div class="controls-panel">
-            <div class="panel-header">
-                <h2>⚙️ 控制面板</h2>
-                <button type="button" id="toggle-panel-btn" class="toggle-btn">◀</button>
-            </div>
-            
-            <div class="panel-content">
-                <div class="api-key-section">
-                    <h3>API 设置</h3>
-                    <input type="password" id="api-key-input" placeholder="输入你的 OpenRouter API 密钥 (必填)">
-                    <div class="api-key-controls">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="remember-key-checkbox">
-                            <span class="checkmark"></span>
-                            记住密钥
-                        </label>
-                        <button type="button" id="clear-key-btn" class="clear-btn">清除已保存密钥</button>
-                    </div>
-                </div>
-
-                <div class="template-section">
-                    <h3>提示词模板</h3>
-                    <div class="template-controls">
-                        <select id="template-select">
-                            <option value="">选择提示词模板...</option>
-                        </select>
-                        <div class="template-buttons">
-                            <button type="button" id="save-template-btn" class="template-btn">保存</button>
-                            <button type="button" id="manage-templates-btn" class="template-btn">管理</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="upload-section">
-                    <h3>图片上传</h3>
-                    <div class="upload-area">
-                        <input type="file" id="image-upload" accept="image/*" multiple>
-                        <label for="image-upload">
-                            <p>点击或拖拽上传</p>
-                            <span>支持多张图片</span>
-                        </label>
-                    </div>
-                    <div id="thumbnails-container"></div>
-                </div>
-
+                
                 <!-- 数据备份恢复功能 -->
                 <div class="backup-controls">
                     <h3>数据备份</h3>
@@ -91,8 +32,43 @@
                         <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(this)">
                         <button type="button" id="import-data-btn" class="backup-btn" onclick="document.getElementById('import-file-input').click()">导入数据</button>
                     </div>
-                    <p class="backup-note">💡 导出数据可保存您的API密钥和提示词模板</p>
+                    <p class="backup-note">💡 导出数据可保存您的API密钥和提示词模板，即使修改代码也不会丢失</p>
                 </div>
+            </div>
+            <div class="upload-section">
+                <h2>1. 上传图片</h2>
+                <div class="upload-area">
+                    <input type="file" id="image-upload" accept="image/*" multiple>
+                    <label for="image-upload">
+                        <p>点击或拖拽上传</p>
+                        <span>支持多张图片</span>
+                    </label>
+                </div>
+                <div id="thumbnails-container"></div>
+            </div>
+
+            <div class="prompt-section">
+                <h2>2. 输入提示词</h2>
+                <div class="template-controls">
+                    <select id="template-select">
+                        <option value="">选择提示词模板...</option>
+                    </select>
+                    <button type="button" id="save-template-btn" class="template-btn">保存为模板</button>
+                    <button type="button" id="manage-templates-btn" class="template-btn">管理模板</button>
+                </div>
+                <textarea id="prompt-input" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
+            </div>
+
+            <button id="generate-btn">
+                <span class="btn-text">生成</span>
+                <span class="spinner hidden"></span>
+            </button>
+        </div>
+
+        <div class="result-container">
+            <h2>生成结果</h2>
+            <div id="result-image-container">
+                <p>生成的图片将显示在这里</p>
             </div>
         </div>
     </div>
