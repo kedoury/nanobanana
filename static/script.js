@@ -33,28 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // === 预设模板数据 ===
-    const DEFAULT_TEMPLATES = [
-        {
-            name: '图片描述',
-            content: '请详细描述这张图片中的内容，包括人物、物体、场景和氛围。'
-        },
-        {
-            name: '风格转换',
-            content: '将这张图片转换为油画风格，保持原有构图和主要元素。'
-        },
-        {
-            name: '创意重绘',
-            content: '基于这张图片，创作一个科幻主题的全新作品。'
-        },
-        {
-            name: '专业分析',
-            content: '从摄影角度分析这张图片的构图、色彩和技法特点。'
-        },
-        {
-            name: '故事创作',
-            content: '根据这张图片编写一个有趣的故事，描述图中可能发生的情节。'
-        }
-    ];
+    // 默认模板已清空，用户可以自行添加模板
+    const DEFAULT_TEMPLATES = [];
 
     // === 初始化函数 ===
     function initializeApp() {
@@ -104,13 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === 模板管理功能 ===
     function initializeTemplates() {
-        let templates = getStoredTemplates();
-        
-        // 如果没有保存的模板，使用默认模板
-        if (templates.length === 0) {
-            templates = DEFAULT_TEMPLATES;
-            saveTemplates(templates);
-        }
+        // 直接加载已保存的模板，不再自动添加默认模板
+        // 用户可以通过界面手动添加需要的模板
+        const templates = getStoredTemplates();
+        // 模板为空时不做任何操作，让用户自行管理
     }
 
     function getStoredTemplates() {
@@ -465,4 +442,100 @@ document.addEventListener('DOMContentLoaded', () => {
         img.alt = 'Generated image';
         resultContainer.appendChild(img);
     }
+
+    // === 数据持久化功能 ===
+    // 导出用户数据（API密钥和模板）
+    function exportUserData() {
+        try {
+            const userData = {
+                apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || '',
+                rememberKey: localStorage.getItem(STORAGE_KEYS.REMEMBER_KEY) || 'false',
+                templates: getStoredTemplates(),
+                exportDate: new Date().toISOString(),
+                version: '1.0'
+            };
+
+            const dataStr = JSON.stringify(userData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `nanobanana-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('数据导出成功！文件已下载到您的下载文件夹。');
+        } catch (error) {
+            console.error('导出数据失败:', error);
+            alert('导出数据失败，请重试。');
+        }
+    }
+
+    // 导入用户数据
+    function importUserData(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const userData = JSON.parse(e.target.result);
+                    
+                    // 验证数据格式
+                    if (!userData.version || !userData.exportDate) {
+                        throw new Error('无效的备份文件格式');
+                    }
+
+                    // 恢复API密钥设置
+                    if (userData.apiKey) {
+                        localStorage.setItem(STORAGE_KEYS.API_KEY, userData.apiKey);
+                    }
+                    if (userData.rememberKey) {
+                        localStorage.setItem(STORAGE_KEYS.REMEMBER_KEY, userData.rememberKey);
+                    }
+
+                    // 恢复模板数据
+                    if (userData.templates && Array.isArray(userData.templates)) {
+                        saveTemplates(userData.templates);
+                    }
+
+                    // 重新加载界面
+                    loadSavedApiKey();
+                    loadTemplateOptions();
+                    
+                    alert(`数据导入成功！\n导出时间: ${new Date(userData.exportDate).toLocaleString()}\n模板数量: ${userData.templates ? userData.templates.length : 0}`);
+                    resolve();
+                } catch (error) {
+                    console.error('导入数据失败:', error);
+                    alert('导入数据失败：' + error.message);
+                    reject(error);
+                }
+            };
+            reader.onerror = () => {
+                alert('读取文件失败，请重试。');
+                reject(new Error('文件读取失败'));
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    // 处理文件导入的辅助函数
+    function handleImportFile(input) {
+        const file = input.files[0];
+        if (file) {
+            if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                alert('请选择有效的JSON文件');
+                return;
+            }
+            
+            importUserData(file).finally(() => {
+                // 清空文件输入，允许重复选择同一文件
+                input.value = '';
+            });
+        }
+    }
+
+    // 将导出导入函数暴露到全局，供HTML调用
+    window.exportUserData = exportUserData;
+    window.importUserData = importUserData;
+    window.handleImportFile = handleImportFile;
 });
