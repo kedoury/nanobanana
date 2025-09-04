@@ -22,8 +22,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const newTemplateContent = document.getElementById('new-template-content');
     const addTemplateBtn = document.getElementById('add-template-btn');
     const templatesList = document.getElementById('templates-list');
+    
+    // === 尺寸模板元素获取 ===
+    const sizeTemplateButtons = document.querySelectorAll('.size-template-btn');
+    const clearSizeTemplateBtn = document.getElementById('clear-size-template-btn');
+    const sizeTemplatePreview = document.getElementById('size-template-preview');
+    const selectedRatioSpan = document.getElementById('selected-ratio');
+    const sizeTemplateImage = document.getElementById('size-template-image');
 
     let selectedFiles = [];
+    let currentSizeTemplate = null; // 当前选择的尺寸模板
+    
+    // === 尺寸模板常量 ===
+    const SIZE_TEMPLATE_PROMPT = "Transfer the content of Figure 1 to Figure 2. Expand Figure 1's content to match Figure 2's aspect ratio. Completely erase Figure 2's existing content, retaining only its aspect ratio";
 
     // === 本地存储键名常量 ===
     const STORAGE_KEYS = {
@@ -40,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSavedApiKey(); // 等待API密钥加载完成
         initializeTemplates();
         loadTemplateOptions();
+        initializeSizeTemplates();
         bindEventListeners();
     }
 
@@ -280,6 +292,126 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('模板删除成功！');
     };
 
+    // === 尺寸模板功能 ===
+    function initializeSizeTemplates() {
+        // 绑定尺寸模板按钮事件
+        sizeTemplateButtons.forEach(btn => {
+            btn.addEventListener('click', () => selectSizeTemplate(btn));
+        });
+        
+        // 绑定清除按钮事件
+        clearSizeTemplateBtn.addEventListener('click', clearSizeTemplate);
+    }
+    
+    async function selectSizeTemplate(button) {
+        const ratio = button.dataset.ratio;
+        const fileName = button.dataset.file;
+        
+        try {
+            // 移除其他按钮的激活状态
+            sizeTemplateButtons.forEach(btn => btn.classList.remove('active'));
+            // 激活当前按钮
+            button.classList.add('active');
+            
+            // 加载尺寸模板图片
+            const imageUrl = `/static/${fileName}`;
+            const response = await fetch(imageUrl);
+            
+            if (!response.ok) {
+                throw new Error(`无法加载尺寸模板图片: ${fileName}`);
+            }
+            
+            // 将图片转换为 Blob 然后转为 File 对象
+            const blob = await response.blob();
+            const file = new File([blob], fileName, { type: blob.type });
+            
+            // 更新当前尺寸模板状态
+            currentSizeTemplate = {
+                ratio: ratio,
+                fileName: fileName,
+                file: file
+            };
+            
+            // 显示预览
+            showSizeTemplatePreview(ratio, imageUrl);
+            
+            // 追加提示词
+            appendSizeTemplatePrompt();
+            
+            // 自动添加到选中文件列表（作为第一张图片）
+            addSizeTemplateToFiles(file);
+            
+            console.log(`✅ 已选择尺寸模板: ${ratio} (${fileName})`);
+            
+        } catch (error) {
+            console.error('选择尺寸模板失败:', error);
+            alert(`选择尺寸模板失败: ${error.message}`);
+        }
+    }
+    
+    function showSizeTemplatePreview(ratio, imageUrl) {
+        selectedRatioSpan.textContent = ratio;
+        sizeTemplateImage.src = imageUrl;
+        sizeTemplatePreview.classList.remove('hidden');
+    }
+    
+    function appendSizeTemplatePrompt() {
+        const currentPrompt = promptInput.value.trim();
+        
+        // 检查是否已经包含尺寸模板提示词
+        if (!currentPrompt.includes(SIZE_TEMPLATE_PROMPT)) {
+            const newPrompt = currentPrompt ? 
+                `${currentPrompt}\n\n${SIZE_TEMPLATE_PROMPT}` : 
+                SIZE_TEMPLATE_PROMPT;
+            promptInput.value = newPrompt;
+        }
+    }
+    
+    function addSizeTemplateToFiles(file) {
+        // 移除之前的尺寸模板文件（如果存在）
+        selectedFiles = selectedFiles.filter(f => !f.name.match(/^(169|11|916)\.jpg$/));
+        
+        // 将尺寸模板文件添加到列表开头
+        selectedFiles.unshift(file);
+        
+        // 重新渲染缩略图
+        refreshThumbnails();
+    }
+    
+    function clearSizeTemplate() {
+        // 移除所有按钮的激活状态
+        sizeTemplateButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // 隐藏预览
+        sizeTemplatePreview.classList.add('hidden');
+        
+        // 清除当前尺寸模板状态
+        currentSizeTemplate = null;
+        
+        // 从文件列表中移除尺寸模板文件
+        selectedFiles = selectedFiles.filter(f => !f.name.match(/^(169|11|916)\.jpg$/));
+        
+        // 从提示词中移除尺寸模板提示词
+        const currentPrompt = promptInput.value;
+        const cleanedPrompt = currentPrompt.replace(SIZE_TEMPLATE_PROMPT, '').replace(/\n\n+/g, '\n\n').trim();
+        promptInput.value = cleanedPrompt;
+        
+        // 重新渲染缩略图
+        refreshThumbnails();
+        
+        console.log('✅ 已清除尺寸模板');
+    }
+    
+    function refreshThumbnails() {
+        // 清空缩略图容器
+        thumbnailsContainer.innerHTML = '';
+        
+        // 重新创建所有缩略图
+        selectedFiles.forEach(file => {
+            createThumbnail(file);
+        });
+    }
+    
     // === 工具函数 ===
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -368,6 +500,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const wrapper = document.createElement('div');
             wrapper.className = 'thumbnail-wrapper';
             
+            // 检查是否为尺寸模板文件
+            const isSizeTemplate = file.name.match(/^(169|11|916)\.jpg$/);
+            if (isSizeTemplate) {
+                wrapper.classList.add('size-template-thumbnail');
+            }
+            
             const img = document.createElement('img');
             img.src = e.target.result;
             img.alt = file.name;
@@ -378,7 +516,21 @@ document.addEventListener('DOMContentLoaded', () => {
             removeBtn.onclick = () => {
                 selectedFiles = selectedFiles.filter(f => f.name !== file.name);
                 wrapper.remove();
+                
+                // 如果删除的是尺寸模板文件，同时清除尺寸模板状态
+                if (isSizeTemplate) {
+                    clearSizeTemplate();
+                }
             };
+            
+            // 为尺寸模板添加标识
+            if (isSizeTemplate) {
+                const templateLabel = document.createElement('div');
+                templateLabel.className = 'template-label';
+                templateLabel.innerHTML = '📐';
+                templateLabel.title = '尺寸模板';
+                wrapper.appendChild(templateLabel);
+            }
             
             wrapper.appendChild(img);
             wrapper.appendChild(removeBtn);
