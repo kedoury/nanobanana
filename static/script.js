@@ -2121,7 +2121,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // 压缩图片（如果有）
             let compressedImages = [];
             if (currentImages.length > 0) {
-                compressedImages = await imageCompressor.compressImages(currentImages);
+                const compressionResult = await imageCompressor.compressImages(currentImages);
+                // 提取压缩成功的图片数据
+                compressedImages = compressionResult.results.map(item => ({
+                    data: item.result.dataUrl,
+                    format: item.result.format,
+                    width: item.result.width,
+                    height: item.result.height,
+                    size: item.result.compressedSize
+                }));
             }
 
             // 创建用户消息
