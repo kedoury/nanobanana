@@ -8,14 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generate-btn');
     const btnText = generateBtn.querySelector('.btn-text');
     const spinner = generateBtn.querySelector('.spinner');
-    
-    // === 聊天界面元素获取 ===
-    const chatMessages = document.getElementById('chat-messages');
-    const currentSessionTitle = document.getElementById('current-session-title');
-    const sessionsList = document.getElementById('sessions-list');
-    const newChatBtn = document.getElementById('new-chat-btn');
-    const clearChatBtn = document.getElementById('clear-chat-btn');
-    const deleteSessionBtn = document.getElementById('delete-session-btn');
+    const resultContainer = document.getElementById('result-image-container');
 
     // === 新功能元素获取 ===
     const rememberKeyCheckbox = document.getElementById('remember-key-checkbox');
@@ -30,19 +23,113 @@ document.addEventListener('DOMContentLoaded', () => {
     const addTemplateBtn = document.getElementById('add-template-btn');
     const templatesList = document.getElementById('templates-list');
 
+    // === 聊天界面元素获取 ===
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendMessageBtn = document.getElementById('send-message-btn');
+    const attachImageBtn = document.getElementById('attach-image-btn');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    const exportChatBtn = document.getElementById('export-chat-btn');
+    const togglePanelBtn = document.getElementById('toggle-panel-btn');
+    const controlsPanel = document.querySelector('.controls-panel');
+
     let selectedFiles = [];
-    let currentSessionId = null;
-    let sessions = {};
-    let isGenerating = false;
+    let chatManager = new ChatManager();
+    let currentChatImages = []; // 当前聊天中选择的图片
 
     // === 本地存储键名常量 ===
     const STORAGE_KEYS = {
         API_KEY: 'nanobanana_api_key',
         REMEMBER_KEY: 'nanobanana_remember_key',
         TEMPLATES: 'nanobanana_templates',
-        SESSIONS: 'nanobanana_sessions',
-        CURRENT_SESSION: 'nanobanana_current_session'
+        CHAT_HISTORY: 'nanobanana_chat_history'
     };
+
+    // === 聊天数据结构 ===
+    class ChatMessage {
+        constructor(role, content, images = [], timestamp = null) {
+            this.id = Date.now() + Math.random(); // 唯一标识符
+            this.role = role; // 'user' 或 'assistant'
+            this.content = content; // 文本内容
+            this.images = images; // 图片数组 [{url, name, base64}]
+            this.timestamp = timestamp || new Date().toISOString();
+            this.status = 'sent'; // 'sending', 'sent', 'error'
+        }
+    }
+
+    // === 聊天管理类 ===
+    class ChatManager {
+        constructor() {
+            this.messages = [];
+            this.loadChatHistory();
+        }
+
+        // 添加消息
+        addMessage(role, content, images = []) {
+            const message = new ChatMessage(role, content, images);
+            this.messages.push(message);
+            this.saveChatHistory();
+            return message;
+        }
+
+        // 获取所有消息
+        getAllMessages() {
+            return this.messages;
+        }
+
+        // 获取上下文消息（用于API调用）
+        getContextMessages(maxMessages = 10) {
+            // 返回最近的消息，用于维持对话上下文
+            return this.messages.slice(-maxMessages).map(msg => ({
+                role: msg.role,
+                content: msg.content,
+                images: msg.images
+            }));
+        }
+
+        // 清空聊天记录
+        clearChat() {
+            this.messages = [];
+            this.saveChatHistory();
+        }
+
+        // 删除单条消息
+        deleteMessage(messageId) {
+            this.messages = this.messages.filter(msg => msg.id !== messageId);
+            this.saveChatHistory();
+        }
+
+        // 保存聊天记录到本地存储
+        saveChatHistory() {
+            try {
+                localStorage.setItem(STORAGE_KEYS.CHAT_HISTORY, JSON.stringify(this.messages));
+            } catch (e) {
+                console.error('无法保存聊天记录:', e);
+            }
+        }
+
+        // 从本地存储加载聊天记录
+        loadChatHistory() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEYS.CHAT_HISTORY);
+                if (stored) {
+                    this.messages = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.warn('无法加载聊天记录:', e);
+                this.messages = [];
+            }
+        }
+
+        // 导出聊天记录
+        exportChat() {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                messages: this.messages
+            };
+            return JSON.stringify(exportData, null, 2);
+        }
+    }
 
     // === 预设模板数据 ===
     // 默认模板已清空，用户可以自行添加模板
@@ -53,306 +140,73 @@ document.addEventListener('DOMContentLoaded', () => {
         loadSavedApiKey();
         initializeTemplates();
         loadTemplateOptions();
-        initializeChatSystem();
+        initializeChatUI();
         bindEventListeners();
     }
 
-    // === 聊天系统初始化 ===
-    function initializeChatSystem() {
-        loadSessions();
-        loadCurrentSession();
-        if (!currentSessionId) {
-            createNewSession();
-        }
-        renderSessionsList();
-        renderCurrentChat();
+    // === 聊天界面初始化 ===
+    function initializeChatUI() {
+        // 加载历史聊天记录
+        renderChatHistory();
+        // 滚动到底部
+        scrollToBottom();
     }
 
-    // === 会话管理功能 ===
-    function loadSessions() {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-            sessions = stored ? JSON.parse(stored) : {};
-        } catch (e) {
-            console.warn('无法读取保存的会话');
-            sessions = {};
-        }
-    }
-
-    function saveSessions() {
-        try {
-            localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-        } catch (e) {
-            console.error('无法保存会话:', e);
-        }
-    }
-
-    function loadCurrentSession() {
-        try {
-            currentSessionId = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
-            if (currentSessionId && !sessions[currentSessionId]) {
-                currentSessionId = null;
-            }
-        } catch (e) {
-            console.warn('无法读取当前会话');
-            currentSessionId = null;
-        }
-    }
-
-    function saveCurrentSession() {
-        try {
-            if (currentSessionId) {
-                localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, currentSessionId);
-            } else {
-                localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-            }
-        } catch (e) {
-            console.error('无法保存当前会话:', e);
-        }
-    }
-
-    function createNewSession() {
-        const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const session = {
-            id: sessionId,
-            title: '新对话',
-            messages: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+    // === 渲染聊天历史 ===
+    function renderChatHistory() {
+        const messages = chatManager.getAllMessages();
         
-        sessions[sessionId] = session;
-        currentSessionId = sessionId;
-        
-        saveSessions();
-        saveCurrentSession();
-        renderSessionsList();
-        renderCurrentChat();
-        updateSessionTitle();
-        
-        return sessionId;
-    }
-
-    function switchToSession(sessionId) {
-        if (sessions[sessionId]) {
-            currentSessionId = sessionId;
-            saveCurrentSession();
-            renderSessionsList();
-            renderCurrentChat();
-            updateSessionTitle();
-            
-            // 清空当前选择的文件
-            selectedFiles = [];
-            thumbnailsContainer.innerHTML = '';
-            promptInput.value = '';
-        }
-    }
-
-    function deleteSession(sessionId) {
-        if (!sessions[sessionId]) return;
-        
-        if (!confirm('确定要删除这个会话吗？所有消息将被永久删除。')) {
-            return;
-        }
-        
-        delete sessions[sessionId];
-        
-        if (currentSessionId === sessionId) {
-            // 如果删除的是当前会话，切换到其他会话或创建新会话
-            const remainingSessions = Object.keys(sessions);
-            if (remainingSessions.length > 0) {
-                switchToSession(remainingSessions[0]);
-            } else {
-                createNewSession();
-            }
-        }
-        
-        saveSessions();
-        renderSessionsList();
-    }
-
-    function clearCurrentChat() {
-        if (!currentSessionId || !sessions[currentSessionId]) return;
-        
-        if (!confirm('确定要清空当前对话吗？所有消息将被删除。')) {
-            return;
-        }
-        
-        sessions[currentSessionId].messages = [];
-        sessions[currentSessionId].updatedAt = new Date().toISOString();
-        sessions[currentSessionId].title = '新对话';
-        
-        saveSessions();
-        renderSessionsList();
-        renderCurrentChat();
-        updateSessionTitle();
-    }
-
-    function updateSessionTitle() {
-        if (!currentSessionId || !sessions[currentSessionId]) return;
-        
-        const session = sessions[currentSessionId];
-        currentSessionTitle.textContent = session.title;
-    }
-
-    // === 消息管理功能 ===
-    function addMessage(type, content, images = []) {
-        if (!currentSessionId || !sessions[currentSessionId]) return;
-        
-        const message = {
-            id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            type: type, // 'user' 或 'assistant'
-            content: content,
-            images: images,
-            timestamp: new Date().toISOString()
-        };
-        
-        sessions[currentSessionId].messages.push(message);
-        sessions[currentSessionId].updatedAt = new Date().toISOString();
-        
-        // 自动更新会话标题（使用第一条用户消息的前20个字符）
-        if (type === 'user' && sessions[currentSessionId].title === '新对话') {
-            const title = content.length > 20 ? content.substring(0, 20) + '...' : content;
-            sessions[currentSessionId].title = title;
-        }
-        
-        saveSessions();
-        renderSessionsList();
-        updateSessionTitle();
-        
-        return message;
-    }
-
-    function renderSessionsList() {
-        sessionsList.innerHTML = '';
-        
-        const sessionIds = Object.keys(sessions).sort((a, b) => {
-            return new Date(sessions[b].updatedAt) - new Date(sessions[a].updatedAt);
-        });
-        
-        if (sessionIds.length === 0) {
-            sessionsList.innerHTML = '<p style="color: #888; text-align: center; padding: 1rem;">暂无对话</p>';
-            return;
-        }
-        
-        sessionIds.forEach(sessionId => {
-            const session = sessions[sessionId];
-            const sessionItem = document.createElement('div');
-            sessionItem.className = `session-item ${sessionId === currentSessionId ? 'active' : ''}`;
-            
-            const lastMessage = session.messages.length > 0 ? session.messages[session.messages.length - 1] : null;
-            const preview = lastMessage ? 
-                (lastMessage.content.length > 30 ? lastMessage.content.substring(0, 30) + '...' : lastMessage.content) : 
-                '暂无消息';
-            
-            sessionItem.innerHTML = `
-                <div class="session-title">${escapeHtml(session.title)}</div>
-                <div class="session-preview">${escapeHtml(preview)}</div>
-                <div class="session-time">${formatTime(session.updatedAt)}</div>
-            `;
-            
-            sessionItem.addEventListener('click', () => switchToSession(sessionId));
-            sessionsList.appendChild(sessionItem);
-        });
-    }
-
-    function renderCurrentChat() {
-        if (!currentSessionId || !sessions[currentSessionId]) {
-            chatMessages.innerHTML = '<div class="welcome-message"><p>👋 欢迎使用 nano banana！</p><p>上传图片并输入提示词开始对话吧</p></div>';
-            return;
-        }
-        
-        const session = sessions[currentSessionId];
+        // 清空聊天容器（保留欢迎消息）
+        const welcomeMessage = chatMessages.querySelector('.welcome-message');
         chatMessages.innerHTML = '';
         
-        if (session.messages.length === 0) {
-            chatMessages.innerHTML = '<div class="welcome-message"><p>👋 欢迎使用 nano banana！</p><p>上传图片并输入提示词开始对话吧</p></div>';
-            return;
+        if (messages.length === 0) {
+            // 如果没有历史消息，显示欢迎消息
+            if (welcomeMessage) {
+                chatMessages.appendChild(welcomeMessage);
+            }
+        } else {
+            // 渲染所有历史消息
+            messages.forEach(message => {
+                renderMessage(message);
+            });
         }
-        
-        session.messages.forEach(message => {
-            renderMessage(message);
-        });
-        
-        // 滚动到底部
-        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // === 渲染单条消息 ===
     function renderMessage(message) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.type}`;
+        messageDiv.className = `message ${message.role}`;
         messageDiv.dataset.messageId = message.id;
-        
-        const bubbleDiv = document.createElement('div');
-        bubbleDiv.className = 'message-bubble';
-        
-        let content = '';
-        
-        // 渲染图片（如果有）
+
+        let imagesHtml = '';
         if (message.images && message.images.length > 0) {
-            content += '<div class="message-images">';
-            message.images.forEach(imageData => {
-                content += `<img src="${imageData}" class="message-image" alt="上传的图片">`;
-            });
-            content += '</div>';
+            const imagesContainer = message.role === 'user' ? 
+                '<div class="message-images">' : '<div class="message-images">';
+            imagesHtml = imagesContainer + 
+                message.images.map(img => 
+                    `<img src="${img.url}" alt="${img.name}" class="message-image" onclick="openImagePreview('${img.url}')">`
+                ).join('') + '</div>';
         }
-        
-        // 渲染文本内容
-        content += `<p class="message-content">${escapeHtml(message.content)}</p>`;
-        
-        // 渲染时间
-        content += `<div class="message-time">${formatTime(message.timestamp)}</div>`;
-        
-        bubbleDiv.innerHTML = content;
-        messageDiv.appendChild(bubbleDiv);
-        chatMessages.appendChild(messageDiv);
-    }
 
-    function showTypingIndicator() {
-        const existingIndicator = chatMessages.querySelector('.typing-indicator');
-        if (existingIndicator) return;
-        
-        const typingDiv = document.createElement('div');
-        typingDiv.className = 'typing-indicator';
-        typingDiv.innerHTML = `
-            <div class="typing-dots">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        `;
-        
-        chatMessages.appendChild(typingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    function hideTypingIndicator() {
-        const typingIndicator = chatMessages.querySelector('.typing-indicator');
-        if (typingIndicator) {
-            typingIndicator.remove();
-        }
-    }
-
-    // === 工具函数 ===
-    function formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        
-        if (diffMins < 1) return '刚刚';
-        if (diffMins < 60) return `${diffMins}分钟前`;
-        if (diffHours < 24) return `${diffHours}小时前`;
-        if (diffDays < 7) return `${diffDays}天前`;
-        
-        return date.toLocaleDateString('zh-CN', {
-            month: 'short',
-            day: 'numeric',
+        const timeStr = new Date(message.timestamp).toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit'
         });
+
+        messageDiv.innerHTML = `
+            ${message.role === 'user' ? imagesHtml : ''}
+            <div class="message-content">${message.content}</div>
+            ${message.role === 'assistant' ? imagesHtml : ''}
+            <div class="message-time">${timeStr}</div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+    }
+
+    // === 滚动到底部 ===
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     // === 密钥记忆功能 ===
@@ -572,27 +426,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // === 工具函数 ===
-    function formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        
-        if (diffMins < 1) return '刚刚';
-        if (diffMins < 60) return `${diffMins}分钟前`;
-        if (diffHours < 24) return `${diffHours}小时前`;
-        if (diffDays < 7) return `${diffDays}天前`;
-        
-        return date.toLocaleDateString('zh-CN', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -613,6 +446,21 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModalBtn.addEventListener('click', closeTemplateModal);
         addTemplateBtn.addEventListener('click', addNewTemplate);
         
+        // 聊天功能事件
+        sendMessageBtn.addEventListener('click', sendChatMessage);
+        attachImageBtn.addEventListener('click', () => fileInput.click());
+        clearChatBtn.addEventListener('click', clearChatHistory);
+        exportChatBtn.addEventListener('click', exportChatHistory);
+        togglePanelBtn.addEventListener('click', toggleControlsPanel);
+        
+        // 聊天输入框事件
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+        
         // 模态框背景点击关闭
         templateModal.addEventListener('click', (e) => {
             if (e.target === templateModal) {
@@ -624,20 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !templateModal.classList.contains('hidden')) {
                 closeTemplateModal();
-            }
-        });
-        
-        // 聊天界面事件
-        newChatBtn.addEventListener('click', createNewSession);
-        clearChatBtn.addEventListener('click', clearCurrentChat);
-        
-        // 提示词输入框回车发送
-        promptInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (!isGenerating && promptInput.value.trim()) {
-                    generateBtn.click();
-                }
             }
         });
     }
@@ -728,8 +562,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 设置生成状态
-        isGenerating = true;
         setLoading(true);
 
         try {
@@ -739,100 +571,30 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. 等待所有文件转换完成
             const base64Images = await Promise.all(conversionPromises);
             
-            // 3. 添加用户消息到聊天历史
-            const userMessage = addMessage('user', promptInput.value, base64Images);
-            renderMessage(userMessage);
-            
-            // 4. 显示打字指示器
-            showTypingIndicator();
-            
-            // 5. 构建消息历史（包含上下文）
-            const messages = [];
-            if (currentSessionId && sessions[currentSessionId]) {
-                const session = sessions[currentSessionId];
-                // 添加历史消息到请求中（最近10条消息以保持上下文）
-                const recentMessages = session.messages.slice(-10);
-                
-                recentMessages.forEach(msg => {
-                    if (msg.type === 'user') {
-                        const content = [{ type: "text", text: msg.content }];
-                        if (msg.images && msg.images.length > 0) {
-                            msg.images.forEach(imageData => {
-                                content.push({
-                                    type: "image_url",
-                                    image_url: { url: imageData }
-                                });
-                            });
-                        }
-                        messages.push({ role: "user", content });
-                    } else if (msg.type === 'assistant') {
-                        messages.push({
-                            role: "assistant",
-                            content: [{ type: "text", text: msg.content }]
-                        });
-                    }
-                });
-            }
-            
-            // 6. 构建请求数据
-            const requestData = {
-                model: "google/gemini-2.0-flash-exp",
-                messages: messages
-            };
-            
-            // 7. 发送请求
-            const response = await fetch('/api/generate', {
+            // 3. 发送包含 images 数组的请求
+            const response = await fetch('/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKeyInput.value}`
                 },
-                body: JSON.stringify(requestData)
+                body: JSON.stringify({
+                    prompt: promptInput.value,
+                    images: base64Images, // 注意：这里从 'image' 改为了 'images'，并且值是一个数组
+                    apikey: apiKeyInput.value
+                })
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP ${response.status}`);
-            }
 
             const data = await response.json();
 
-            if (data.choices && data.choices[0] && data.choices[0].message) {
-                const result = data.choices[0].message.content;
-                
-                // 隐藏打字指示器
-                hideTypingIndicator();
-                
-                // 添加AI回复到聊天历史
-                const assistantMessage = addMessage('assistant', result);
-                renderMessage(assistantMessage);
-                
-                // 清空输入框和文件选择
-                promptInput.value = '';
-                selectedFiles = [];
-                thumbnailsContainer.innerHTML = '';
-                
-                // 滚动到底部
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                
-            } else {
-                throw new Error('响应格式错误');
+            if (data.error) {
+                throw new Error(data.error);
             }
+
+            displayResult(data.imageUrl);
         } catch (error) {
-            console.error('生成失败:', error);
-            
-            // 隐藏打字指示器
-            hideTypingIndicator();
-            
-            // 添加错误消息
-            const errorMessage = addMessage('assistant', `❌ 生成失败: ${error.message}`);
-            renderMessage(errorMessage);
-            
-            // 滚动到底部
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            alert('Error: ' + error.message);
+            resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
         } finally {
-            // 恢复按钮状态
-            isGenerating = false;
             setLoading(false);
         }
     });
@@ -944,13 +706,212 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('请选择有效的JSON文件');
                 return;
             }
-            
-            importUserData(file).finally(() => {
-                // 清空文件输入，允许重复选择同一文件
-                input.value = '';
-            });
+            importUserData(file);
         }
     }
+
+    // === 聊天功能实现 ===
+    
+    // 发送聊天消息
+    async function sendChatMessage() {
+        const message = chatInput.value.trim();
+        if (!message && currentChatImages.length === 0) {
+            alert('请输入消息或上传图片');
+            return;
+        }
+
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+            alert('请先输入API密钥');
+            return;
+        }
+
+        // 禁用发送按钮
+        sendMessageBtn.disabled = true;
+        sendMessageBtn.textContent = '发送中...';
+        
+        try {
+            // 创建用户消息
+            const userMessage = new ChatMessage('user', message, [...currentChatImages]);
+            chatManager.addMessage(userMessage);
+            renderMessage(userMessage);
+            
+            // 清空输入
+            chatInput.value = '';
+            currentChatImages = [];
+            updateImagePreview();
+            
+            // 显示AI思考状态
+            showTypingIndicator();
+            
+            // 准备API请求数据
+            const chatHistory = chatManager.getMessages();
+            const messages = chatHistory.map(msg => ({
+                role: msg.role,
+                content: msg.images && msg.images.length > 0 ? [
+                    { type: 'text', text: msg.content },
+                    ...msg.images.map(img => ({
+                        type: 'image_url',
+                        image_url: { url: img }
+                    }))
+                ] : msg.content
+            }));
+
+            // 发送API请求
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messages: messages,
+                    apiKey: apiKey
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // 隐藏思考状态
+            hideTypingIndicator();
+            
+            // 创建AI回复消息
+            const aiMessage = new ChatMessage('assistant', data.content);
+            chatManager.addMessage(aiMessage);
+            renderMessage(aiMessage);
+            
+        } catch (error) {
+            console.error('发送消息失败:', error);
+            hideTypingIndicator();
+            
+            // 创建错误消息
+            const errorMessage = new ChatMessage('assistant', `抱歉，发生了错误：${error.message}`);
+            chatManager.addMessage(errorMessage);
+            renderMessage(errorMessage);
+        } finally {
+            // 恢复发送按钮
+            sendMessageBtn.disabled = false;
+            sendMessageBtn.textContent = '发送';
+            scrollToBottom();
+        }
+    }
+    
+    // 显示AI思考指示器
+    function showTypingIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'message ai-message typing-indicator';
+        indicator.id = 'typing-indicator';
+        indicator.innerHTML = `
+            <div class="message-content">
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        `;
+        chatMessages.appendChild(indicator);
+        scrollToBottom();
+    }
+    
+    // 隐藏AI思考指示器
+    function hideTypingIndicator() {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+    
+    // 清空聊天记录
+    function clearChatHistory() {
+        if (!confirm('确定要清空所有聊天记录吗？此操作不可撤销。')) {
+            return;
+        }
+        
+        chatManager.clearHistory();
+        chatMessages.innerHTML = '';
+        currentChatImages = [];
+        updateImagePreview();
+        alert('聊天记录已清空');
+    }
+    
+    // 导出聊天记录
+    function exportChatHistory() {
+        try {
+            const chatData = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                messages: chatManager.getMessages(),
+                totalMessages: chatManager.getMessages().length
+            };
+            
+            const blob = new Blob([JSON.stringify(chatData, null, 2)], {
+                type: 'application/json'
+            });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chat-history-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert('聊天记录导出成功！');
+        } catch (error) {
+            console.error('导出聊天记录失败:', error);
+            alert('导出聊天记录失败，请重试。');
+        }
+    }
+    
+    // 切换控制面板显示/隐藏
+    function toggleControlsPanel() {
+        const controlsPanel = document.querySelector('.controls-panel');
+        controlsPanel.classList.toggle('hidden');
+        
+        const isHidden = controlsPanel.classList.contains('hidden');
+        togglePanelBtn.textContent = isHidden ? '显示控制面板' : '隐藏控制面板';
+    }
+    
+    // 更新图片预览
+    function updateImagePreview() {
+        const previewContainer = document.querySelector('.image-preview');
+        if (!previewContainer) {
+            // 如果预览容器不存在，创建一个
+            const container = document.createElement('div');
+            container.className = 'image-preview';
+            chatInput.parentNode.insertBefore(container, chatInput);
+        }
+        
+        const preview = document.querySelector('.image-preview');
+        preview.innerHTML = '';
+        
+        currentChatImages.forEach((imageData, index) => {
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'preview-image';
+            imgContainer.innerHTML = `
+                <img src="${imageData}" alt="预览图片 ${index + 1}">
+                <button onclick="removeImage(${index})" class="remove-btn">×</button>
+            `;
+            preview.appendChild(imgContainer);
+        });
+    }
+    
+    // 移除图片
+    window.removeImage = function(index) {
+        currentChatImages.splice(index, 1);
+        updateImagePreview();
+    };
+
+    // 将聊天功能函数暴露到全局
+    window.sendChatMessage = sendChatMessage;
+    window.clearChatHistory = clearChatHistory;
+    window.exportChatHistory = exportChatHistory;
+    window.toggleControlsPanel = toggleControlsPanel;
 
     // 将导出导入函数暴露到全局，供HTML调用
     window.exportUserData = exportUserData;
