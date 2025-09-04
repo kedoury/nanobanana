@@ -36,15 +36,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEFAULT_TEMPLATES = [];
 
     // === 初始化函数 ===
-    function initializeApp() {
-        loadSavedApiKey();
+    async function initializeApp() {
+        await loadSavedApiKey(); // 等待API密钥加载完成
         initializeTemplates();
         loadTemplateOptions();
         bindEventListeners();
     }
 
     // === 密钥记忆功能 ===
-    function loadSavedApiKey() {
+    async function loadSavedApiKey() {
+        // 1. 首先尝试从环境变量获取API密钥
+        try {
+            const response = await fetch('/api/get-env-key');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.hasEnvKey && data.apiKey) {
+                    apiKeyInput.value = data.apiKey;
+                    apiKeyInput.placeholder = '已从环境变量自动加载API密钥';
+                    console.log('✅ 已从环境变量自动加载API密钥');
+                    return; // 如果环境变量有密钥，就不需要从本地存储加载了
+                }
+            }
+        } catch (error) {
+            console.warn('无法从环境变量获取API密钥:', error);
+        }
+
+        // 2. 如果环境变量没有密钥，则尝试从本地存储加载
         const rememberKey = localStorage.getItem(STORAGE_KEYS.REMEMBER_KEY) === 'true';
         const savedKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
         
@@ -54,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const decodedKey = atob(savedKey);
                 apiKeyInput.value = decodedKey;
                 rememberKeyCheckbox.checked = true;
+                console.log('✅ 已从本地存储加载保存的API密钥');
             } catch (e) {
                 console.warn('无法解码保存的API密钥');
                 localStorage.removeItem(STORAGE_KEYS.API_KEY);
@@ -299,7 +317,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // === 启动应用 ===
-    initializeApp();
+    initializeApp().catch(error => {
+        console.error('应用初始化失败:', error);
+    });
 
     // 拖放功能
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
