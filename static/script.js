@@ -44,6 +44,22 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "整合内容尺寸到最后一张图",
             content: "Transfer the completed content to the final figure. Expand the image content to match the final figure's aspect ratio. Completely erase the final figure's existing content, retaining only its aspect ratio"
+        },
+        {
+            name: "参考图2制作海报",
+            content: "Remove the background of the Figure 1, refer to the Figure 2 and add text packaging that matches the character style to make a game promotional poster"
+        },
+        {
+            name: "参考图2修改形象",
+            content: "Keep the style and character movements of Figure 1, and modify the character image with reference to Figure 2"
+         },
+        {
+            name: "户外真人COS",
+            content: "Generate a photo of a cosplayer dressed in the costume of the illustrated character, posing with the action of the character in the picture, with exquisite makeup, set in an anime exhibition, outdoors, under strong sunlight."
+          },
+        {
+            name: "室内真人COS",
+            content: "Generate a highly detailed photo of a girl cosplaying this illustration, at Comiket. Exactly replicate the same pose, body posture, hand gestures, facial expression, and camera framing as in the original illustration. Keep the same angle, perspective, and composition, without any deviation"
         }
     ];
 
