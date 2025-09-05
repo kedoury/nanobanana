@@ -1,4 +1,5 @@
-document.addEventListener('DOMContentLoaded', () => {
+<script>
+document.addEventListener('DOMContentLoaded', () => { 
     // === 基础元素获取 ===
     const uploadArea = document.querySelector('.upload-area');
     const fileInput = document.getElementById('image-upload');
@@ -35,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         TEMPLATES: 'nanobanana_templates'
     };
 
-    // === 预设模板数据 ===
+    // === 预设模板数据（保持 name 唯一）===
     const DEFAULT_TEMPLATES = [
         {
             name: "图1改图2尺寸",
@@ -52,11 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "参考图2修改形象",
             content: "Keep the style and character movements of Figure 1, and modify the character image with reference to Figure 2"
-         },
+        },
         {
             name: "户外真人COS",
             content: "Generate a photo of a cosplayer dressed in the costume of the illustrated character, posing with the action of the character in the picture, with exquisite makeup, set in an anime exhibition, outdoors, under strong sunlight."
-          },
+        },
         {
             name: "室内真人COS",
             content: "Generate a highly detailed photo of a girl cosplaying this illustration, at Comiket. Exactly replicate the same pose, body posture, hand gestures, facial expression, and camera framing as in the original illustration. Keep the same angle, perspective, and composition, without any deviation"
@@ -66,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // === 初始化函数 ===
     async function initializeApp() {
         await loadSavedApiKey(); // 等待API密钥加载完成
-        initializeTemplates();
+        initializeTemplates();   // ★ 改成“合并默认模板”策略
         loadTemplateOptions();
         bindEventListeners();
     }
@@ -127,14 +128,40 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('已清除保存的API密钥');
     }
 
-    // === 模板管理功能 ===
+    // === 模板管理功能（方案B：合并默认模板） ===
     function initializeTemplates() {
-        let templates = getStoredTemplates();
-        
-        // 如果没有保存的模板，使用默认模板
-        if (templates.length === 0) {
-            templates = DEFAULT_TEMPLATES;
-            saveTemplates(templates);
+        let stored = getStoredTemplates();
+
+        // 首次：直接写入默认模板
+        if (!stored.length) {
+            saveTemplates(DEFAULT_TEMPLATES);
+            return;
+        }
+
+        // 其后：把“默认模板中新增的项（按 name 去重）”并入本地
+        const existingNames = new Set(stored.map(t => t.name));
+        let changed = false;
+
+        DEFAULT_TEMPLATES.forEach(def => {
+            if (!existingNames.has(def.name)) {
+                stored.push(def);
+                changed = true;
+            }
+        });
+
+        // ★ 不覆盖同名模板内容（保护用户自定义/旧版本修改）
+        if (changed) {
+            saveTemplates(stored);
+        }
+    }
+
+    // （可选）一键恢复默认模板
+    function resetToDefaultTemplates() {
+        if (confirm('将清空现有模板并恢复为默认模板，确定吗？')) {
+            saveTemplates(DEFAULT_TEMPLATES);
+            loadTemplateOptions();
+            renderTemplatesList();
+            alert('已恢复默认模板');
         }
     }
 
@@ -315,6 +342,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTemplatesList();
         alert('模板删除成功！');
     };
+
+    // （可选）把重置函数也挂到全局，方便你在控制台调用或绑定按钮
+    window.resetToDefaultTemplates = resetToDefaultTemplates;
 
     // === 图库功能 ===
     async function selectGalleryImage(galleryItem) {
@@ -528,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
             displayResult(data.imageUrl);
         } catch (error) {
             alert('Error: ' + error.message);
-            resultContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+            resultContainer.innerHTML = `<p>Error: ${escapeHtml(error.message)}</p>`;
         } finally {
             setLoading(false);
         }
@@ -558,3 +588,4 @@ document.addEventListener('DOMContentLoaded', () => {
         resultContainer.appendChild(img);
     }
 });
+</script>
