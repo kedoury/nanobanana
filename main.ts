@@ -126,6 +126,7 @@ async function callOpenRouter(messages: any[], apiKey: string): Promise<{ type: 
 // --- 主服务逻辑 ---
 serve(async (req) => {
     const pathname = new URL(req.url).pathname;
+    console.log(`[DEBUG] Received request: ${req.method} ${pathname}`);
     
     if (req.method === 'OPTIONS') { return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization, x-goog-api-key" } }); }
 
@@ -228,8 +229,10 @@ serve(async (req) => {
 
     // --- 路由 3: 获取环境变量中的API密钥 (为前端自动填充) ---
     if (pathname === "/api/get-env-key") {
+        console.log(`[DEBUG] Matched /api/get-env-key route`);
         try {
             const envApiKey = Deno.env.get("OPENROUTER_API_KEY");
+            console.log(`[DEBUG] Environment API key: ${envApiKey ? 'Found' : 'Not found'}`);
             return new Response(JSON.stringify({ 
                 hasEnvKey: !!envApiKey,
                 apiKey: envApiKey || null 
@@ -238,6 +241,7 @@ serve(async (req) => {
                 headers: { "Content-Type": "application/json" }
             });
         } catch (error) {
+            console.log(`[DEBUG] Error in /api/get-env-key: ${error.message}`);
             return createJsonErrorResponse("Failed to get environment API key", 500);
         }
     }
