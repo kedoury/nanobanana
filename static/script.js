@@ -1,4 +1,3 @@
-<script>
 document.addEventListener('DOMContentLoaded', () => { 
     // === 基础元素获取 ===
     const uploadArea = document.querySelector('.upload-area');
@@ -588,4 +587,3 @@ document.addEventListener('DOMContentLoaded', () => {
         resultContainer.appendChild(img);
     }
 });
-</script>
