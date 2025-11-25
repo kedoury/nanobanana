@@ -4,14 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>nano banana</title>
-    <link rel="icon" href="/xiguadepi.jpeg" type="image/jpeg">
+    <link rel="icon" href="/favicon.png" type="image/png">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1 class="title">🍌 nano banana</h1>
-    <p class="subtitle">(模型: google/gemini-2.5-flash-image-preview:free)</p>
+    <div class="top-right-actions">
+        <a href="https://shiyijian.deno.dev/" class="action-btn" target="_blank" rel="noopener noreferrer">试衣间</a>
+        <a href="https://storyboards.deno.dev/" class="action-btn" target="_blank" rel="noopener noreferrer">分镜制作</a>
+    </div>
+    <div class="title-container">
+        <img src="chipbanana.gif" alt="nano banana" class="title-gif">
+    </div>
+    
+    <!-- 模型选择器 -->
+    
+    
     <div class="main-container">
         <div class="controls-container">
+            <!-- Nano Banana 控制面板 -->
+            <div id="nanobanana-controls" class="model-controls">
             <div class="api-key-section">
                 <h2>设置</h2>
                 <input type="password" id="api-key-input" placeholder="输入你的 OpenRouter API 密钥 (必填)">
@@ -23,42 +34,32 @@
                     </label>
                     <button type="button" id="clear-key-btn" class="clear-btn">清除已保存密钥</button>
                 </div>
+                
+                <!-- 自动清除偏好设置 -->
+                <div class="preference-controls">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto-clear-checkbox">
+                        <span class="checkmark"></span>
+                        发送后自动清除图片和提示词
+                    </label>
+                </div>
             </div>
             <div class="upload-section">
-                <h2>1. 上传图片</h2>
+                <h2>上传图片</h2>
                 <div class="upload-area">
                     <input type="file" id="image-upload" accept="image/*" multiple>
                     <label for="image-upload">
                         <p>点击或拖拽上传</p>
                         <span>支持多张图片</span>
-                        <p class="upload-hint">💡 图片上传是可选的，支持纯文字生成图片</p>
-                        <p class="generation-tips">🎨 生成图片提示：使用"生成"、"创作"、"画"、"绘制"等词汇，描述越详细效果越好</p>
                     </label>
                 </div>
                 <div id="thumbnails-container"></div>
             </div>
 
-            <div class="gallery-section">
-                <h2>📚 图库选择</h2>
-                <p class="gallery-description">选择预设图片添加到上传序列</p>
-                <div class="gallery-container">
-                    <div class="gallery-item" data-image="11.jpg">
-                        <img src="11.jpg" alt="预设图片 1:1">
-                        <span class="gallery-label">1:1</span>
-                    </div>
-                    <div class="gallery-item" data-image="916.jpg">
-                        <img src="916.jpg" alt="预设图片 9:16">
-                        <span class="gallery-label">9:16</span>
-                    </div>
-                    <div class="gallery-item" data-image="169.jpg">
-                        <img src="169.jpg" alt="预设图片 16:9">
-                        <span class="gallery-label">16:9</span>
-                    </div>
-                </div>
-            </div>
+            
 
             <div class="prompt-section">
-                <h2>2. 输入提示词</h2>
+                <h2>输入提示词</h2>
                 <div class="template-controls">
                     <select id="template-select">
                         <option value="">选择提示词模板...</option>
@@ -66,17 +67,59 @@
                     <button type="button" id="save-template-btn" class="template-btn">保存为模板</button>
                     <button type="button" id="manage-templates-btn" class="template-btn">管理模板</button>
                 </div>
-                <textarea id="prompt-input" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
+                <textarea id="prompt-input" placeholder="例如：一只穿着香蕉装的橙色阔耳狐在跳舞，电影级灯光"></textarea>
             </div>
 
-            <button id="generate-btn">
-                <span class="btn-text">生成</span>
-                <span class="spinner hidden"></span>
+            <div class="nb-settings-section">
+                <div class="nb-setting-item">
+                    <label for="nb-aspect-select">尺寸比例</label>
+                    <select id="nb-aspect-select">
+                        <option value="16:9">16:9</option>
+                        <option value="1:1">1:1</option>
+                        <option value="9:16">9:16</option>
+                    </select>
+                </div>
+                <div class="nb-setting-item">
+                    <label for="nb-resolution-select">分辨率</label>
+                    <select id="nb-resolution-select">
+                        <option value="1k">1k</option>
+                        <option value="2k">2k</option>
+                        <option value="4k">4k</option>
+                    </select>
+                    <div id="nb-resolution-output" class="param-note"></div>
+                </div>
+            </div>
+
+            <button type="button" id="generate-btn" class="outer-cont flex">
+                <svg viewBox="0 0 24 24" height="24" width="24" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="none">
+                        <path d="m12.594 23.258l-.012.002l-.071.035l-.02.004l-.014-.004l-.071-.036q-.016-.004-.024.006l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.016-.018m.264-.113l-.014.002l-.184.093l-.01.01l-.003.011l.018.43l.005.012l.008.008l.201.092q.019.005.029-.008l.004-.014l-.034-.614q-.005-.019-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.003-.011l.018-.43l-.003-.012l-.01-.01z"></path>
+                        <path d="M9.107 5.448c.598-1.75 3.016-1.803 3.725-.159l.06.16l.807 2.36a4 4 0 0 0 2.276 2.411l.217.081l2.36.806c1.75.598 1.803 3.016.16 3.725l-.16.06l-2.36.807a4 4 0 0 0-2.412 2.276l-.081.216l-.806 2.361c-.598 1.75-3.016 1.803-3.724.16l-.062-.16l-.806-2.36a4 4 0 0 0-2.276-2.412l-.216-.081l-2.36-.806c-1.751-.598-1.804-3.016-.16-3.724l.16-.062l2.36-.806A4 4 0 0 0 8.22 8.025l.081-.216zM11 6.094l-.806 2.36a6 6 0 0 1-3.49 3.649l-.25.091l-2.36.806l2.36.806a6 6 0 0 1 3.649 3.49l.091.25l.806 2.36l.806-2.36a6 6 0 0 1 3.49-3.649l.25-.09l2.36-.807l-2.36-.806a6 6 0 0 1-3.649-3.49l-.09-.25zM19 2a1 1 0 0 1 .898.56l.048.117l.35 1.026l1.027.35a1 1 0 0 1 .118 1.845l-.118.048l-1.026.35l-.35 1.027a1 1 0 0 1-1.845.117l-.048-.117l-.35-1.026l-1.027-.35a1 1 0 0 1-.118-1.845l.118-.048l1.026-.35l.35-1.027A1 1 0 0 1 19 2" fill="currentColor"></path>
+                    </g>
+                </svg>
+                <span class="btn-text">生成魔法</span>
+                <div class="spinner hidden"></div>
             </button>
+            </div>
+            
+        </div>
+
+        <!-- 对话历史区域 -->
+        <div class="conversation-container">
+            <div class="conversation-header">
+                <h2>💬 对话历史</h2>
+                <div class="conversation-controls">
+                    <button type="button" id="clear-conversation-btn" class="clear-btn">清空对话</button>
+                    <button type="button" id="toggle-history-btn" class="toggle-btn">隐藏历史</button>
+                </div>
+            </div>
+            <div id="conversation-history" class="conversation-history">
+                <p class="empty-history">开始新对话...</p>
+            </div>
         </div>
 
         <div class="result-container">
-            <h2>生成结果</h2>
+            <h2>最新结果</h2>
             <div id="result-image-container">
                 <p>生成的图片将显示在这里</p>
             </div>
@@ -105,6 +148,85 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    
+
+    <!-- 图片编辑器弹窗 -->
+    <div id="image-editor-modal" class="modal hidden">
+        <div class="editor-modal-content">
+            <div class="editor-header">
+                <h3>图片编辑器</h3>
+                <button type="button" id="close-editor-btn" class="close-btn">&times;</button>
+            </div>
+            
+            <!-- 工具栏 -->
+            <div class="editor-toolbar">
+                <div class="tool-group">
+                    <button type="button" id="brush-tool" class="tool-btn active" title="画笔工具">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34c-.39-.39-1.02-.39-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="text-tool" class="tool-btn" title="文字工具">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5 4v3h5.5v12h3V7H19V4z"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="rect-tool" class="tool-btn" title="矩形工具">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="eraser-tool" class="tool-btn" title="橡皮擦">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 0 1-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0M4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l3.53-3.53l-4.95-4.95l-4.95 4.95z"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="tool-group">
+                    <label class="tool-label">颜色:</label>
+                    <input type="color" id="color-picker" value="#ff0000" class="color-input">
+                    
+                    <label class="tool-label">粗细:</label>
+                    <input type="range" id="brush-size" min="1" max="20" value="3" class="size-slider">
+                    <span id="size-display" class="size-display">3px</span>
+                </div>
+                
+                <div class="tool-group">
+                    <button type="button" id="undo-btn" class="tool-btn" title="撤销">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="redo-btn" class="tool-btn" title="重做">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="clear-canvas" class="tool-btn" title="清空画布">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 画布区域 -->
+            <div class="editor-canvas-container">
+                <div class="canvas-wrapper">
+                    <canvas id="background-canvas" class="editor-canvas"></canvas>
+                    <canvas id="drawing-canvas" class="editor-canvas"></canvas>
+                </div>
+            </div>
+            
+            <!-- 底部操作按钮 -->
+            <div class="editor-footer">
+                <button type="button" id="cancel-edit" class="editor-btn cancel-btn">取消</button>
+                <button type="button" id="save-edit" class="editor-btn save-btn">完成编辑</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
