@@ -1,10 +1,10 @@
 import { showToast, setLoading, displayResult, renderConversationHistory, createThumbnail } from './ui.js';
 import { optimizeImageForUpload, compressBase64ToJpeg } from './image-utils.js';
-import { generateImage, fetchEnvKey } from './api.js';
+import { generateImage, fetchEnvKey, generateImageGeminiOfficial } from './api.js';
 import { STORAGE_KEYS, getApiKey, setApiKey, clearApiKey, getRememberKey, setRememberKey, getAutoClearPreference, setAutoClearPreference, getTemplates, saveTemplates, saveModelStates, loadModelStates } from './storage.js';
 import { openImageEditor, updateThumbnail } from './editor.js';
 
-let uploadArea, fileInput, thumbnailsContainer, promptInput, nbAspectSelect, nbResolutionSelect, nbResolutionOutput, apiKeyInput, generateBtn, btnText, spinner, resultContainer;
+let uploadArea, fileInput, thumbnailsContainer, promptInput, nbAspectSelect, nbResolutionSelect, nbResolutionOutput, apiKeyInput, googleApiKeyInput, generateBtn, btnText, spinner, resultContainer;
 let conversationHistoryDiv, clearConversationBtn, toggleHistoryBtn, isHistoryVisible;
 let rememberKeyCheckbox, clearKeyBtn, autoClearCheckbox, templateSelect, saveTemplateBtn, manageTemplatesBtn, templateModal, closeModalBtn, newTemplateName, newTemplateContent, addTemplateBtn, templatesList;
 let selectedFiles = [];
@@ -141,7 +141,6 @@ export function handleFiles(files) {
 }
 
 export async function handleNanoBananaGeneration() {
-  if (!apiKeyInput.value.trim()) { alert('请输入 OpenRouter API 密钥'); return; }
   if (!promptInput.value.trim()) { alert('请输入提示词'); return; }
   setLoading(true, { generateBtn, btnText, spinner });
   try {
@@ -173,9 +172,9 @@ export async function handleNanoBananaGeneration() {
       }
     }
 
-    // 比例 & 分辨率：只告诉模型目标，不再强制具体像素
     const aspect = nbAspectSelect?.value || '16:9';
-    const resLabel = (nbResolutionSelect?.value || '1k').toUpperCase();
+    const resLevel = nbResolutionSelect?.value || '1k';
+    const resLabel = (resLevel || '1k').toUpperCase();
     messageContent.push({
       type: 'text',
       text: `请按比例 ${aspect} 与分辨率档位 ${resLabel} 生成图片，尽量保持画面构图完整，不要故意加黑边或大幅裁切。`
@@ -190,14 +189,21 @@ export async function handleNanoBananaGeneration() {
     if (isFirstMessage) { initializeConversationHistory(); conversationHistory.push(currentUserMessage); isFirstMessage = false; }
     else { conversationHistory.push(currentUserMessage); }
 
-    // 带上 aspect_ratio / resolution 给后端（OpenRouter / Gemini）
-    const data = await generateImage({
-      prompt: promptInput.value,
-      images: base64Images,
-      apikey: apiKeyInput.value,
-      conversationHistory,
-      parameters: { aspect_ratio: aspect, resolution: resLabel }
-    });
+    let data;
+    if (resLevel === '1k') {
+      if (!apiKeyInput.value.trim()) { throw new Error('请输入 OpenRouter API 密钥'); }
+      data = await generateImage({
+        prompt: promptInput.value,
+        images: base64Images,
+        apikey: apiKeyInput.value,
+        conversationHistory,
+        parameters: { aspect_ratio: aspect, resolution: resLabel }
+      });
+    } else {
+      if (!googleApiKeyInput || !googleApiKeyInput.value.trim()) { throw new Error('请输入 Google Gemini API 密钥'); }
+      const imageSize = resLabel === '2K' ? '2K' : '4K';
+      data = await generateImageGeminiOfficial(messageContent, aspect, imageSize, googleApiKeyInput.value.trim());
+    }
 
     if (data.error) { throw new Error(data.error); }
     if (data.usedFallback && data.model) { showToast(`已切换到后备模型：${data.model}`, 'warning', 4000); }
@@ -263,6 +269,7 @@ export async function initializeApp() {
   nbResolutionSelect = document.getElementById('nb-resolution-select');
   nbResolutionOutput = document.getElementById('nb-resolution-output');
   apiKeyInput = document.getElementById('api-key-input');
+  googleApiKeyInput = document.getElementById('google-api-key-input');
   generateBtn = document.getElementById('generate-btn');
   btnText = generateBtn ? generateBtn.querySelector('.btn-text') : null;
   spinner = generateBtn ? generateBtn.querySelector('.spinner') : null;
