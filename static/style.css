@@ -5,45 +5,105 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #121212;
+    /* 网格背景样式 */
+    background: #000000;
+    --gap: 5em;
+    --line: 1px;
+    --color: rgba(255, 255, 255, 0.2);
+    background-image: linear-gradient(
+        -90deg,
+        transparent calc(var(--gap) - var(--line)),
+        var(--color) calc(var(--gap) - var(--line) + 1px),
+        var(--color) var(--gap)
+    ),
+    linear-gradient(
+        0deg,
+        transparent calc(var(--gap) - var(--line)),
+        var(--color) calc(var(--gap) - var(--line) + 1px),
+        var(--color) var(--gap)
+    );
+    background-size: var(--gap) var(--gap);
     color: #e0e0e0;
     margin: 0;
-    padding: 2rem;
+    padding: 1.5rem; /* 从2rem减少到1.5rem，配合缩放效果 */
     min-height: 100vh;
     box-sizing: border-box;
+    overflow-x: auto; /* 允许水平滚动以适应缩放后的内容 */
 }
 
-.title {
-    font-size: 3rem;
-    font-weight: 700;
-    /* 渐变色应用于文本，不影响 emoji */
-    background: linear-gradient(90deg, #fde047, #f97316, #ef4444);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 0.2rem; /* 减小与副标题的距离 */
+.top-right-actions {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 1100;
 }
 
-.title span {
-    background: linear-gradient(90deg, #fde047, #f97316, #ef4444);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.action-btn {
+    background: #444;
+    color: #e0e0e0;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.subtitle {
-    text-align: center;
-    color: #888;
+.action-btn:hover {
+    background: #555;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 1024px) {
+    .top-right-actions {
+        top: 8px;
+        right: 8px;
+        gap: 6px;
+    }
+    .action-btn {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+}
+
+.title-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     margin-bottom: 2rem;
-    font-size: 1rem;
 }
 
+.title-gif {
+    height: 4rem;
+    width: auto;
+    max-width: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 模型选择器样式（已移除） */
+
+/* 主容器布局 - 针对高分辨率显示器优化 */
 .main-container {
     display: flex;
     gap: 2rem;
     width: 100%;
-    max-width: 1400px;
+    max-width: 2400px; /* 从2200px进一步扩大到2400px，模拟90%缩放的视觉效果 */
     margin: 0 auto;
+    transition: max-width 0.3s ease; /* 平滑的宽度变化动画 */
+    transform: scale(0.95); /* 整体缩放到95%，接近90%缩放的视觉效果 */
+    transform-origin: top center; /* 从顶部中心开始缩放 */
 }
 
+/* 控制面板容器 - 高分辨率优化 */
 .controls-container {
     flex: 1;
     background: #1e1e1e;
@@ -51,19 +111,47 @@ body {
     border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    max-width: 600px;
+    max-width: 800px; /* 从600px扩大到800px，提供更多操作空间 */
+    min-width: 500px; /* 设置最小宽度，确保内容不会过于紧凑 */
 }
 
+/* 结果显示容器 - 高分辨率优化 */
 .result-container {
-    flex: 1;
+    flex: 2; /* 从flex: 1改为flex: 2，给结果区域更多空间 */
     background: #1e1e1e;
     padding: 2rem;
     border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    min-height: 600px;
+    min-height: auto;
     display: flex;
     flex-direction: column;
+}
+
+.result-image-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.result-download-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #e0e0e0;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    opacity: 0.6;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.result-image-wrapper:hover .result-download-btn {
+    opacity: 1;
+    transform: translateY(-1px);
 }
 
 h2 {
@@ -77,6 +165,125 @@ h2 {
 .upload-section, .prompt-section, .api-key-section, .gallery-section {
     margin-bottom: 2rem;
 }
+
+/* 缩短设置与上传之间的间距为50% */
+.api-key-section {
+    margin-bottom: 1rem;
+}
+
+.upload-section {
+    margin-bottom: 1rem;
+}
+
+.prompt-section {
+    margin-bottom: 1rem;
+}
+
+/* 模型控制面板样式 */
+.model-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.model-controls.hidden {
+    display: none;
+}
+
+/* ModelScope设置区域样式 */
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.nb-settings-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.nb-setting-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.setting-item label {
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.param-note {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: normal;
+    opacity: 0.8;
+}
+
+.setting-item input, .setting-item select, .nb-setting-item select {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #252525;
+    color: #e0e0e0;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.setting-item input:focus, .setting-item select:focus, .nb-setting-item select:focus {
+    border-color: #f97316;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.setting-item input:hover, .setting-item select:hover, .nb-setting-item select:hover {
+    border-color: #555;
+}
+
+#nb-aspect-select, #nb-resolution-select {
+    min-width: 120px;
+}
+
+.nb-setting-item .param-note {
+    margin-left: 6px;
+}
+
+/* 错误消息样式 */
+.error-message {
+    color: #ef4444;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    min-height: 1rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.error-message:not(.hidden) {
+    opacity: 1;
+}
+
+/* 数量选择器样式（已移除） */
 
 .upload-area {
     border: 2px dashed #444;
@@ -125,11 +332,28 @@ input[type="file"] {
     display: none;
 }
 
+/* 缩略图容器 - 响应式网格优化 */
 #thumbnails-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 1rem;
     margin-top: 1rem;
+    transition: gap 0.3s ease;
+}
+
+/* 高分辨率下的缩略图优化 */
+@media (min-width: 1920px) {
+    #thumbnails-container {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* 2K下缩略图稍大 */
+        gap: 1.2rem;
+    }
+}
+
+@media (min-width: 2560px) {
+    #thumbnails-container {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 4K下缩略图更大 */
+        gap: 1.5rem;
+    }
 }
 
 .thumbnail-wrapper {
@@ -180,37 +404,110 @@ textarea, input[type="password"] {
     box-sizing: border-box;
     margin-bottom: 0.5rem;
     font-family: inherit;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* 提示词输入框特殊样式 */
+textarea:focus {
+    border-color: #f97316;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* 粘贴成功时的视觉反馈 */
+textarea.paste-success {
+    border-color: #4CAF50 !important;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4) !important;
+    animation: pasteSuccess 0.6s ease;
+}
+
+@keyframes pasteSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+
 
 input[type="password"] {
     min-height: auto;
 }
 
-#generate-btn {
-    background: linear-gradient(90deg, #f97316, #ef4444);
-    color: white;
-    padding: 12px 25px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 500;
-    width: 100%;
-    position: relative;
+/* 新的炫酷按钮样式 */
+.flex {
     display: flex;
     align-items: center;
+    gap: 8px;
+}
+
+/* 统一的炫酷按钮样式 - 适用于所有生成按钮 */
+.outer-cont {
+    padding: 12px 20px;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    position: relative;
+    background: linear-gradient(90deg, #5bfcc4, #f593e4, #71a4f0);
+    border-radius: 12px;
+    color: #fff;
+    transition: all 0.3s ease;
+    box-shadow: 
+        inset 0px 0px 5px #ffffffa9,
+        inset 0px 35px 30px #000,
+        0px 5px 10px #000000cc;
+    text-shadow: 1px 1px 1px #000;
+    width: 100%;
     justify-content: center;
-    gap: 0.5rem;
-    transition: transform 0.2s ease, opacity 0.2s ease;
+    font-weight: 500;
 }
 
-#generate-btn:not(:disabled):hover {
-    transform: translateY(-2px);
+.outer-cont::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    border-radius: 12px;
+    filter: blur(0);
+    z-index: -1;
+    box-shadow: none;
+    background: conic-gradient(
+        #00000000 80deg,
+        #40baf7,
+        #f34ad7,
+        #5bfcc4,
+        #00000000 280deg
+    );
+    transition: all 0.3s ease;
 }
 
-#generate-btn:disabled {
-    opacity: 0.7;
+.outer-cont:hover::before {
+    filter: blur(15px);
+}
+
+.outer-cont:active::before {
+    filter: blur(5px);
+    transform: translateY(1px);
+}
+
+.outer-cont:active {
+    box-shadow: 
+        inset 0px 0px 5px #ffffffa9,
+        inset 0px 35px 30px #000;
+    margin-top: 3px;
+}
+
+.outer-cont:disabled {
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
+}
+
+.outer-cont:disabled::before {
+    filter: blur(0);
+}
+
+.outer-cont svg {
+    fill: currentColor;
+    flex-shrink: 0;
 }
 
 .spinner {
@@ -232,6 +529,7 @@ input[type="password"] {
     display: none !important;
 }
 
+/* 结果图片容器 - 高分辨率优化 */
 #result-image-container {
     flex: 1;
     background-color: #252525;
@@ -241,17 +539,48 @@ input[type="password"] {
     justify-content: center;
     align-items: center;
     min-height: 400px;
+    transition: min-height 0.3s ease;
 }
 
 #result-image-container img {
     max-width: 100%;
     max-height: 100%;
     border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* 增加图片阴影效果 */
+    transition: transform 0.2s ease;
+}
+
+#result-image-container img:hover {
+    transform: scale(1.02); /* 鼠标悬停时轻微放大 */
 }
 
 #result-image-container p {
     color: #888;
     text-align: center;
+    font-size: 1.1rem;
+}
+
+/* 高分辨率下的结果容器优化 */
+@media (min-width: 1920px) {
+    #result-image-container {
+        min-height: 500px;
+        padding: 1.5rem;
+    }
+    
+    #result-image-container p {
+        font-size: 1.2rem;
+    }
+}
+
+@media (min-width: 2560px) {
+    #result-image-container {
+        min-height: 600px;
+        padding: 2rem;
+    }
+    
+    #result-image-container p {
+        font-size: 1.3rem;
+    }
 }
 
 /* 密钥记忆功能样式 */
@@ -261,6 +590,13 @@ input[type="password"] {
     align-items: center;
     margin-top: 0.5rem;
     gap: 1rem;
+}
+
+/* 偏好设置样式 */
+.preference-controls {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #333;
 }
 
 .checkbox-label {
@@ -505,53 +841,99 @@ input[type="password"] {
     white-space: pre-wrap;
 }
 
-/* 图库功能样式 */
-.gallery-description {
-    color: #888;
+/* 图库按钮样式 */
+.gallery-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #444;
+    color: #e0e0e0;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
     font-size: 0.9rem;
-    margin-bottom: 1rem;
-    margin-top: -0.5rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    justify-content: center;
 }
 
-.gallery-container {
+.gallery-btn:hover {
+    background: #555;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.gallery-btn svg {
+    fill: currentColor;
+}
+
+/* 图库弹窗网格样式 */
+.gallery-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    gap: 1.5rem;
+    padding: 1rem 0;
 }
 
-.gallery-item {
+/* 图库弹窗中的图片项样式 */
+.gallery-grid .gallery-item {
     position: relative;
     aspect-ratio: 1;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background: #252525;
 }
 
-.gallery-item:hover {
+.gallery-grid .gallery-item:hover {
     border-color: #f97316;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(249, 115, 22, 0.4);
 }
 
-.gallery-item.selected {
+.gallery-grid .gallery-item.selected {
     border-color: #22c55e;
-    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
 }
 
-.gallery-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
+.gallery-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-.gallery-item:hover img {
+.gallery-grid .gallery-item:hover .gallery-overlay {
+    opacity: 1;
+}
+
+.select-btn {
+    background: linear-gradient(90deg, #f97316, #ef4444);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: transform 0.2s ease;
+}
+
+.select-btn:hover {
     transform: scale(1.05);
 }
 
+/* 通用图库标签样式 */
 .gallery-label {
     position: absolute;
     bottom: 4px;
@@ -564,13 +946,106 @@ input[type="password"] {
     font-weight: 500;
 }
 
+/* 图库弹窗中的图片样式 */
+.gallery-grid .gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.gallery-grid .gallery-item:hover img {
+    transform: scale(1.05);
+}
+
+/* 4K显示器优化 (3840px及以上) */
+@media (min-width: 2560px) {
+    .main-container {
+        max-width: 3000px; /* 4K显示器使用更大宽度，配合缩放效果 */
+        gap: 3rem; /* 增加间距 */
+    }
+    
+    .controls-container {
+        max-width: 900px; /* 4K下控制面板可以更宽 */
+        padding: 2.5rem;
+    }
+    
+    .result-container {
+        min-height: 800px; /* 4K下提供更大的预览空间 */
+    }
+    
+    .conversation-container {
+        max-height: 900px; /* 4K下显示更多历史记录 */
+    }
+    
+    body {
+        padding: 3rem; /* 4K下增加页面边距 */
+    }
+}
+
+/* 2K显示器优化 (1920px-2559px) */
+@media (min-width: 1920px) and (max-width: 2559px) {
+    .main-container {
+        max-width: 2500px; /* 2K显示器的最佳宽度，配合缩放效果 */
+        gap: 2.5rem;
+    }
+    
+    .controls-container {
+        max-width: 750px;
+        padding: 2.25rem;
+    }
+    
+    .result-container {
+        min-height: 750px;
+    }
+    
+    .conversation-container {
+        max-height: 750px;
+    }
+}
+
+/* 标准大屏幕优化 (1400px-1919px) */
+@media (min-width: 1400px) and (max-width: 1919px) {
+    .main-container {
+        max-width: 1600px; /* 比原来的1400px稍大 */
+    }
+    
+    .controls-container {
+        max-width: 700px;
+    }
+}
+
+/* 中等屏幕优化 (1024px-1399px) */
+@media (min-width: 1025px) and (max-width: 1399px) {
+    .main-container {
+        max-width: 1200px;
+        gap: 1.5rem;
+    }
+    
+    .controls-container {
+        max-width: 600px;
+        min-width: 400px;
+    }
+    
+    .result-container {
+        min-height: 600px;
+    }
+    
+    .conversation-container {
+        max-height: 600px;
+    }
+}
+
+/* 平板和小屏幕 (1024px及以下) */
 @media (max-width: 1024px) {
     .main-container {
         flex-direction: column;
+        max-width: none;
     }
     
     .controls-container {
         max-width: none;
+        min-width: auto;
     }
     
     body {
@@ -596,10 +1071,476 @@ input[type="password"] {
         margin: 1rem;
     }
     
-    .gallery-container {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.8rem;
+    .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
     }
+    
+    /* 模型选择器响应式适配 */
+    .model-selector-container {
+        flex-direction: column;
+        border-radius: 12px;
+        padding: 8px;
+        gap: 4px;
+    }
+    
+    .model-selector-container::before {
+        display: none; /* 在移动端隐藏高亮背景 */
+    }
+    
+    .model-card {
+        border-radius: 8px;
+        margin: 0;
+        padding: 0.7rem 1rem;
+        min-width: auto;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .model-card.active {
+        background: linear-gradient(90deg, #f97316, #ef4444);
+        box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    }
+    
+    .model-card:hover {
+        transform: none; /* 移动端移除悬停变换 */
+    }
+    
+    /* ModelScope控制面板响应式适配 */
+    .settings-section {
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .setting-item {
+        gap: 0.4rem;
+    }
+    
+    .setting-item label {
+        font-size: 0.85rem;
+        flex-wrap: wrap;
+    }
+    
+    .param-note {
+        font-size: 0.7rem;
+        margin-top: 0.2rem;
+    }
+    
+    .count-buttons-container {
+        flex-wrap: wrap;
+    }
+    
+    .count-btn {
+        min-width: 60px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+}
+
+/* 对话历史区域样式 - 高分辨率优化 */
+.conversation-container {
+    flex: 1;
+    background: #1e1e1e;
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid #333;
+    margin-bottom: 0;
+    max-height: none;
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.conversation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #333;
+}
+
+.conversation-header h2 {
+    margin: 0;
+    color: #e0e0e0;
+    font-size: 1.5rem;
+}
+
+.conversation-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.toggle-btn {
+    background: #333;
+    color: #e0e0e0;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.toggle-btn:hover {
+    background: #444;
+}
+
+.conversation-history {
+    flex: 0 0 auto;
+    height: 825px;
+    overflow-y: auto;
+    padding: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overscroll-behavior: contain;
+}
+
+.conversation-history.hidden {
+    display: none;
+}
+
+.empty-history {
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    margin: 2rem 0;
+}
+
+/* 对话消息样式 - 高分辨率优化 */
+.message {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-radius: 8px;
+    max-width: 80%;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    margin-bottom: 0.5rem;
+}
+
+.message:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.message.user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8); /* 渐变背景 */
+    color: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.message.assistant {
+    align-self: flex-start;
+    background: linear-gradient(135deg, #374151, #1f2937); /* 渐变背景 */
+    color: #e0e0e0;
+    box-shadow: 0 2px 8px rgba(55, 65, 81, 0.3);
+}
+
+.message-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.message-text {
+    line-height: 1.6; /* 提高行高，增强可读性 */
+    font-size: 0.95rem;
+}
+
+.message-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 6px;
+    object-fit: cover;
+    transition: transform 0.2s ease;
+}
+
+.message-image:hover {
+    transform: scale(1.05);
+}
+
+.message-timestamp {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    align-self: flex-end;
+}
+
+/* 高分辨率下的消息优化 */
+@media (min-width: 1920px) {
+    .message {
+        padding: 1.2rem;
+        max-width: 75%; /* 2K下稍微缩小最大宽度 */
+    }
+    
+    .message-text {
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+    
+    .message-image {
+        max-width: 250px;
+        max-height: 250px;
+    }
+}
+
+@media (min-width: 2560px) {
+    .message {
+        padding: 1.5rem;
+        max-width: 70%; /* 4K下进一步优化宽度 */
+    }
+    
+    .message-text {
+        font-size: 1.1rem;
+        line-height: 1.8;
+    }
+    
+    .message-image {
+        max-width: 300px;
+        max-height: 300px;
+    }
+}
+
+/* 隐藏历史样式 */
+.conversation-history.hidden {
+    display: none;
+}
+
+/* 结果文本样式 */
+.result-text {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* 空历史提示样式 */
+.empty-history {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* 图片编辑器样式 */
+.editor-modal-content {
+    background: #1e1e1e;
+    border-radius: 12px;
+    width: 95%;
+    max-width: 1200px;
+    max-height: 90vh;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #333;
+    background: #252525;
+}
+
+.editor-header h3 {
+    margin: 0;
+    color: #e0e0e0;
+    font-size: 1.25rem;
+}
+
+/* 工具栏样式 */
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: #2a2a2a;
+    border-bottom: 1px solid #333;
+    flex-wrap: wrap;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tool-btn {
+    background: #444;
+    color: #e0e0e0;
+    border: none;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-btn:hover {
+    background: #555;
+    transform: translateY(-1px);
+}
+
+.tool-btn.active {
+    background: linear-gradient(90deg, #f97316, #ef4444);
+    color: white;
+}
+
+.tool-label {
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    margin-left: 1rem;
+}
+
+.color-input {
+    width: 40px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+}
+
+.size-slider {
+    width: 80px;
+    margin: 0 0.5rem;
+}
+
+.size-display {
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    min-width: 30px;
+}
+
+/* 画布容器样式 */
+.editor-canvas-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    background: #1a1a1a;
+    overflow: auto;
+}
+
+.canvas-wrapper {
+    position: relative;
+    border: 2px solid #444;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: inline-block;
+    min-width: 200px;
+    min-height: 200px;
+}
+
+.editor-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: crosshair;
+    display: block;
+}
+
+#background-canvas {
+    z-index: 1;
+}
+
+#drawing-canvas {
+    z-index: 2;
+}
+
+/* 编辑器底部按钮 */
+.editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: #252525;
+    border-top: 1px solid #333;
+}
+
+.editor-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.cancel-btn {
+    background: #666;
+    color: #e0e0e0;
+}
+
+.cancel-btn:hover {
+    background: #777;
+}
+
+.save-btn {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    color: white;
+}
+
+.save-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+/* 编辑按钮样式（缩略图上的编辑按钮） */
+.edit-btn {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: rgba(249, 115, 22, 0.9);
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.thumbnail-wrapper:hover .edit-btn {
+    opacity: 1;
+}
+
+.edit-btn:hover {
+    background: rgba(249, 115, 22, 1);
+}
+
+/* 文字输入框样式 */
+.text-input-overlay {
+    outline: none;
+    min-width: 100px;
+    max-width: 300px;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.text-input-overlay:focus {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transform: scale(1.02);
 }
 
 @media (max-width: 768px) {
@@ -607,7 +1548,59 @@ input[type="password"] {
         font-size: 2rem;
     }
     
-    .controls-container, .result-container {
+    .controls-container, .result-container, .conversation-container {
         max-width: none;
+    }
+    
+    .main-container {
+        flex-direction: column;
+    }
+    
+    .conversation-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .conversation-controls {
+        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .conversation-controls button {
+        width: 100%;
+    }
+    
+    .conversation-history {
+        height: 200px;
+    }
+    
+    .message {
+        max-width: 95%;
+    }
+    
+    /* 编辑器移动端适配 */
+    .editor-modal-content {
+        width: 98%;
+        max-height: 95vh;
+    }
+    
+    .editor-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    
+    .tool-group {
+        justify-content: center;
+    }
+    
+    .editor-footer {
+        flex-direction: column;
+    }
+    
+    .editor-btn {
+        width: 100%;
     }
 }
