@@ -41,6 +41,16 @@ export async function generateImageGeminiOfficial(messageContent, aspect, imageS
   return { error: 'No content returned' };
 }
 
+export async function generateImageGeminiViaBackend(messageContent, aspect, imageSize) {
+  const res = await fetch('/generate-gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageContent, parameters: { aspect_ratio: aspect, resolution: imageSize } })
+  });
+  const data = await res.json();
+  return data;
+}
+
 export async function fetchEnvKey() {
     try {
       const res = await fetch('/api/get-env-key');
