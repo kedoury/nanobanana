@@ -21,13 +21,14 @@ const mimeTypes = {
 const server = http.createServer((req, res) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     
-    // 处理根路径
-    if (req.url === '/') {
-        req.url = '/index.html';
+    // 处理路径并构建静态文件路径（修复绝对路径问题）
+    let urlPath = req.url.split('?')[0];
+    if (urlPath === '/') {
+        urlPath = '/index.html';
     }
-    
-    // 构建文件路径
-    let filePath = path.join(__dirname, 'static', req.url);
+    const staticRoot = path.join(__dirname, 'static');
+    const safeRelative = path.normalize(urlPath).replace(/^[/\\]+/, '').replace(/^\.+/, '');
+    let filePath = path.join(staticRoot, safeRelative);
     
     // 检查文件是否存在
     fs.access(filePath, fs.constants.F_OK, (err) => {
