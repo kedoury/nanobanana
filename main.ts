@@ -276,6 +276,65 @@ serve(async (req: Request) => {
         }
     }
 
+    if (pathname === "/generate-gemini") {
+        try {
+            let requestData: any = {};
+            try { requestData = await req.json(); } catch (e) { return createJsonErrorResponse("Invalid JSON body", 400); }
+            const { messageContent, parameters } = requestData || {};
+            const aspect = parameters?.aspect_ratio || "16:9";
+            const imageSize = parameters?.resolution === "2K" ? "2K" : "4K";
+            const apiKey = safeEnvGet("GEMINI_API_KEY");
+            if (!apiKey) { return createJsonErrorResponse("GEMINI_API_KEY is not set.", 500); }
+
+            const parts = [] as any[];
+            if (Array.isArray(messageContent)) {
+                for (const item of messageContent) {
+                    if (item && item.type === "text" && typeof item.text === "string") { parts.push({ text: item.text }); }
+                    else if (item && item.type === "image_url" && item.image_url && typeof item.image_url.url === "string") {
+                        const url: string = item.image_url.url;
+                        const m = url.match(/^data:(.+);base64,(.*)$/);
+                        if (m) { parts.push({ inlineData: { mimeType: m[1], data: m[2] } }); }
+                    }
+                }
+            }
+
+            const payload = {
+                contents: [ { role: "user", parts } ],
+                generationConfig: { responseModalities: ["TEXT","IMAGE"], imageConfig: { aspectRatio: aspect, imageSize } }
+            };
+
+            const resp = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                let msg = "Gemini API error";
+                try { const err = await resp.json(); msg = err?.error?.message || msg; } catch {}
+                return createJsonErrorResponse(msg, 500);
+            }
+            const data = await resp.json();
+            const candidates = data?.candidates || [];
+            const content = candidates[0]?.content || {};
+            const partsOut = content?.parts || [];
+            for (const p of partsOut) {
+                if (p.inlineData && p.inlineData.data && p.inlineData.mimeType) {
+                    const imageUrl = `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`;
+                    return new Response(JSON.stringify({ imageUrl, model: "gemini-3-pro-image-preview" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+                }
+            }
+            for (const p of partsOut) {
+                if (p.text) {
+                    return new Response(JSON.stringify({ text: p.text, model: "gemini-3-pro-image-preview" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+                }
+            }
+            return createJsonErrorResponse("No content returned", 500);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            return createJsonErrorResponse(msg, 500);
+        }
+    }
+
     // --- 路由 2: Cherry Studio (Gemini, 非流式) ---
     if (pathname.includes(":generateContent")) {
         try {
