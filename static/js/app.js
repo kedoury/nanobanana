@@ -42,7 +42,8 @@ function initializeConversationHistory() {
 async function loadSavedApiKey() {
   try {
     const data = await fetchEnvKey();
-    if (data && data.hasEnvKey && data.apiKey) { apiKeyInput.value = data.apiKey; apiKeyInput.placeholder = '已从环境变量自动加载API密钥'; return; }
+    if (data && data.hasEnvKey && data.apiKey) { apiKeyInput.value = data.apiKey; apiKeyInput.placeholder = '已从环境变量自动加载API密钥'; }
+    if (data && data.hasGoogleKey && data.googleApiKey && googleApiKeyInput) { googleApiKeyInput.value = data.googleApiKey; googleApiKeyInput.placeholder = '已从环境变量自动加载Google API密钥'; }
   } catch {}
   const rememberKey = getRememberKey();
   const savedKey = getApiKey();
