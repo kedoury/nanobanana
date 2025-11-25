@@ -321,9 +321,12 @@ serve(async (req: Request) => {
     if (pathname === "/api/get-env-key") {
         try {
             const envApiKey = Deno.env.get("OPENROUTER_API_KEY");
+            const googleApiKey = Deno.env.get("GEMINI_API_KEY");
             return new Response(JSON.stringify({ 
                 hasEnvKey: !!envApiKey,
-                apiKey: envApiKey || null 
+                apiKey: envApiKey || null,
+                hasGoogleKey: !!googleApiKey,
+                googleApiKey: googleApiKey || null
             }), {
                 status: 200,
                 headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
