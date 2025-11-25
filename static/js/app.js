@@ -1,6 +1,6 @@
 import { showToast, setLoading, displayResult, renderConversationHistory, createThumbnail } from './ui.js';
 import { optimizeImageForUpload, compressBase64ToJpeg } from './image-utils.js';
-import { generateImage, fetchEnvKey, generateImageGeminiOfficial } from './api.js';
+import { generateImage, fetchEnvKey, generateImageGeminiViaBackend } from './api.js';
 import { STORAGE_KEYS, getApiKey, setApiKey, clearApiKey, getRememberKey, setRememberKey, getAutoClearPreference, setAutoClearPreference, getTemplates, saveTemplates, saveModelStates, loadModelStates } from './storage.js';
 import { openImageEditor, updateThumbnail } from './editor.js';
 
@@ -201,9 +201,8 @@ export async function handleNanoBananaGeneration() {
         parameters: { aspect_ratio: aspect, resolution: resLabel }
       });
     } else {
-      if (!googleApiKeyInput || !googleApiKeyInput.value.trim()) { throw new Error('请输入 Google Gemini API 密钥'); }
       const imageSize = resLabel === '2K' ? '2K' : '4K';
-      data = await generateImageGeminiOfficial(messageContent, aspect, imageSize, googleApiKeyInput.value.trim());
+      data = await generateImageGeminiViaBackend(messageContent, aspect, imageSize);
     }
 
     if (data.error) { throw new Error(data.error); }
